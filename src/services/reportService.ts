@@ -34,7 +34,7 @@ export function generateDailyPDFReport(data: ReportData): void {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('SGO VÉRTICE CAMPO - RELATÓRIO DIÁRIO DA OPERAÇÃO', 14, 12);
+  doc.text('VÉRTICE - RELATÓRIO DIÁRIO DA OPERAÇÃO', 14, 12);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');

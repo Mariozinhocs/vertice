@@ -1,4 +1,4 @@
--- SQL Schema para Hostinger MySQL / MariaDB - SGO Vértice Campo
+-- SQL Schema para Hostinger MySQL / MariaDB - Vértice
 -- Compatível com phpMyAdmin e MySQL 5.7+ / 8.0+
 
 CREATE TABLE IF NOT EXISTS `usuarios` (
