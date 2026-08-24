@@ -1,10 +1,10 @@
 import React from 'react';
-import { UserRole } from '../../types';
-import { Shield, MapPin, Users, FileText, Wifi, WifiOff, RefreshCw, Smartphone, Monitor } from 'lucide-react';
+import { User, UserRole } from '../../types';
+import { Shield, MapPin, Users, FileText, Wifi, WifiOff, RefreshCw, Smartphone, Monitor, LogOut, PlusCircle } from 'lucide-react';
 
 interface NavbarProps {
-  currentRole: UserRole;
-  onRoleChange: (role: UserRole) => void;
+  currentUser: User;
+  onLogout: () => void;
   activeTab: string;
   onTabChange: (tab: string) => void;
   isOnline: boolean;
@@ -13,14 +13,29 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  currentRole,
-  onRoleChange,
+  currentUser,
+  onLogout,
   activeTab,
   onTabChange,
   isOnline,
   pendingSyncCount,
   onManualSync
 }) => {
+  const getRoleBadge = () => {
+    switch (currentUser.role) {
+      case 'admin':
+        return { label: '👑 Super Admin', bg: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30' };
+      case 'coordenador':
+        return { label: `📍 Coord. ${currentUser.regionName || 'Zona'}`, bg: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
+      case 'campo':
+        return { label: '📱 Resp. Campo', bg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
+      default:
+        return { label: currentUser.role, bg: 'bg-slate-700 text-slate-300 border-slate-600' };
+    }
+  };
+
+  const badge = getRoleBadge();
+
   return (
     <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -28,39 +43,26 @@ export const Navbar: React.FC<NavbarProps> = ({
           
           {/* Logo & Brand */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 p-0.5 shadow-lg shadow-indigo-500/20 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-indigo-400 p-0.5 shadow-lg shadow-indigo-500/20 flex items-center justify-center">
               <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                <MapPin className="w-5 h-5 text-emerald-400 animate-pulse" />
+                <Shield className="w-4 h-4 text-indigo-400" />
               </div>
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent">
-                  VÉRTICE<span className="text-emerald-400 font-light ml-1">CAMPO</span>
+                  VÉRTICE
                 </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wider">
-                  PWA 2026
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wider hidden sm:inline-block">
+                  Plataforma
                 </span>
               </div>
-              <p className="text-xs text-slate-400 hidden sm:block">Gestão & Auditoria Eleitoral Georreferenciada</p>
             </div>
           </div>
 
-          {/* Navigation Tabs (Admin/Auditor vs Coordinator) */}
+          {/* Navigation Tabs baseadas no Perfil Logado */}
           <nav className="hidden md:flex items-center space-x-1">
-            {currentRole === 'coordenador' ? (
-              <button
-                onClick={() => onTabChange('coordinator-dashboard')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
-                  activeTab === 'coordinator-dashboard'
-                    ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                <Smartphone className="w-4 h-4" />
-                <span>Painel do Coordenador</span>
-              </button>
-            ) : (
+            {currentUser.role === 'admin' && (
               <>
                 <button
                   onClick={() => onTabChange('map')}
@@ -71,7 +73,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   <Monitor className="w-4 h-4" />
-                  <span>Mapa Operacional</span>
+                  <span>Mapa Geral</span>
                 </button>
                 <button
                   onClick={() => onTabChange('audit')}
@@ -93,7 +95,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   <Users className="w-4 h-4" />
-                  <span>Cadastros</span>
+                  <span>Gestão & Ações</span>
                 </button>
                 <button
                   onClick={() => onTabChange('reports')}
@@ -104,21 +106,62 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   <FileText className="w-4 h-4" />
-                  <span>Relatórios</span>
+                  <span>Relatórios PDF</span>
                 </button>
               </>
             )}
+
+            {currentUser.role === 'coordenador' && (
+              <>
+                <button
+                  onClick={() => onTabChange('coordinator-dashboard')}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
+                    activeTab === 'coordinator-dashboard'
+                      ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span>Painel da {currentUser.regionName || 'Zona'}</span>
+                </button>
+                <button
+                  onClick={() => onTabChange('coordinator-actions')}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
+                    activeTab === 'coordinator-actions'
+                      ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Cadastrar Ações da Zona</span>
+                </button>
+              </>
+            )}
+
+            {currentUser.role === 'campo' && (
+              <button
+                onClick={() => onTabChange('field-checkin')}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
+                  activeTab === 'field-checkin'
+                    ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <Smartphone className="w-4 h-4" />
+                <span>Check-in & Evidências</span>
+              </button>
+            )}
           </nav>
 
-          {/* Right Status Controls & Role Switcher */}
+          {/* Right Status Controls, Profile Badge & Logout */}
           <div className="flex items-center space-x-3">
             
             {/* Sync / Online Status */}
-            <div className="flex items-center space-x-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
+            <div className="flex items-center space-x-2 bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs">
               {isOnline ? (
                 <div className="flex items-center text-emerald-400 space-x-1.5">
                   <Wifi className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline font-medium">Online</span>
+                  <span className="hidden lg:inline font-medium">Online</span>
                 </div>
               ) : (
                 <div className="flex items-center text-amber-400 space-x-1.5 animate-pulse">
@@ -134,23 +177,35 @@ export const Navbar: React.FC<NavbarProps> = ({
                   title="Sincronizar check-ins pendentes"
                 >
                   <RefreshCw className="w-3 h-3 animate-spin" />
-                  <span>{pendingSyncCount} pendentes</span>
+                  <span>{pendingSyncCount}</span>
                 </button>
               )}
             </div>
 
-            {/* Role Switcher Select */}
-            <div className="relative">
-              <select
-                value={currentRole}
-                onChange={(e) => onRoleChange(e.target.value as UserRole)}
-                className="bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-              >
-                <option value="admin">👤 Administrador</option>
-                <option value="coordenador">📱 Coordenador (PWA)</option>
-                <option value="auditor">🔍 Gestor / Auditor</option>
-              </select>
+            {/* Profile Info & Badge */}
+            <div className="flex items-center space-x-2 bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
+              <img
+                src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150'}
+                alt={currentUser.name}
+                className="w-6 h-6 rounded-full object-cover border border-slate-700"
+              />
+              <div className="hidden sm:block text-left">
+                <div className="text-xs font-semibold text-white leading-tight">{currentUser.name}</div>
+                <div className={`text-[10px] font-medium px-1.5 py-0.2 rounded border inline-block ${badge.bg}`}>
+                  {badge.label}
+                </div>
+              </div>
             </div>
+
+            {/* Logout Button */}
+            <button
+              onClick={onLogout}
+              className="p-2 rounded-lg bg-slate-800/80 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/30 transition-all text-xs flex items-center gap-1.5"
+              title="Sair do sistema"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden md:inline">Sair</span>
+            </button>
 
           </div>
 
@@ -158,17 +213,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Mobile Navigation Bar */}
         <div className="md:hidden flex items-center justify-around py-2 border-t border-slate-800/80 text-xs font-medium text-slate-400">
-          {currentRole === 'coordenador' ? (
-            <button
-              onClick={() => onTabChange('coordinator-dashboard')}
-              className={`flex flex-col items-center py-1 ${
-                activeTab === 'coordinator-dashboard' ? 'text-indigo-400 font-bold' : ''
-              }`}
-            >
-              <Smartphone className="w-5 h-5" />
-              <span className="mt-1">Check-in PWA</span>
-            </button>
-          ) : (
+          {currentUser.role === 'admin' && (
             <>
               <button
                 onClick={() => onTabChange('map')}
@@ -189,7 +234,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className={`flex flex-col items-center py-1 ${activeTab === 'management' ? 'text-indigo-400 font-bold' : ''}`}
               >
                 <Users className="w-5 h-5" />
-                <span className="mt-1">Cadastros</span>
+                <span className="mt-1">Gestão</span>
               </button>
               <button
                 onClick={() => onTabChange('reports')}
@@ -199,6 +244,41 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="mt-1">Relatórios</span>
               </button>
             </>
+          )}
+
+          {currentUser.role === 'coordenador' && (
+            <>
+              <button
+                onClick={() => onTabChange('coordinator-dashboard')}
+                className={`flex flex-col items-center py-1 ${
+                  activeTab === 'coordinator-dashboard' ? 'text-amber-400 font-bold' : ''
+                }`}
+              >
+                <MapPin className="w-5 h-5" />
+                <span className="mt-1">Painel Zona</span>
+              </button>
+              <button
+                onClick={() => onTabChange('coordinator-actions')}
+                className={`flex flex-col items-center py-1 ${
+                  activeTab === 'coordinator-actions' ? 'text-amber-400 font-bold' : ''
+                }`}
+              >
+                <PlusCircle className="w-5 h-5" />
+                <span className="mt-1">Cadastrar Ação</span>
+              </button>
+            </>
+          )}
+
+          {currentUser.role === 'campo' && (
+            <button
+              onClick={() => onTabChange('field-checkin')}
+              className={`flex flex-col items-center py-1 ${
+                activeTab === 'field-checkin' ? 'text-emerald-400 font-bold' : ''
+              }`}
+            >
+              <Smartphone className="w-5 h-5" />
+              <span className="mt-1">Check-in PWA</span>
+            </button>
           )}
         </div>
 

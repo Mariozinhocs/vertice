@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserRole, User, Campaign, Region, ActionPoint, Team, CheckIn, AuditLog, OperationalMetrics, CheckInStatus } from './types';
+import { User, Campaign, Region, ActionPoint, Team, CheckIn, AuditLog, OperationalMetrics, CheckInStatus } from './types';
 import {
   INITIAL_USERS,
   INITIAL_CAMPAIGNS,
@@ -9,8 +9,11 @@ import {
   INITIAL_CHECKINS,
   INITIAL_AUDIT_LOGS
 } from './services/mockData';
+import { LoginScreen } from './components/auth/LoginScreen';
 import { Navbar } from './components/layout/Navbar';
 import { CoordinatorDashboard } from './components/coordinator/CoordinatorDashboard';
+import { CoordinatorActionsPanel } from './components/coordinator/CoordinatorActionsPanel';
+import { FieldActionView } from './components/field/FieldActionView';
 import { OperationalMap } from './components/admin/OperationalMap';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { AuditPanel } from './components/admin/AuditPanel';
@@ -18,13 +21,23 @@ import { ReportsPanel } from './components/admin/ReportsPanel';
 import { ManagementPanel } from './components/admin/ManagementPanel';
 import { saveCheckInOffline, getPendingSyncCheckIns, markCheckInAsSynced } from './services/offlineStorage';
 
+const AUTH_STORAGE_KEY = 'vertice_authenticated_user';
+
 export const App: React.FC = () => {
-  // State Global da Aplicação
-  const [currentRole, setCurrentRole] = useState<UserRole>('admin');
+  // Estado de Autenticação
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [activeTab, setActiveTab] = useState<string>('map');
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
-  // Entidades
+  // Entidades Globais
   const [users] = useState<User[]>(INITIAL_USERS);
   const [campaigns] = useState<Campaign[]>(INITIAL_CAMPAIGNS);
   const [regions] = useState<Region[]>(INITIAL_REGIONS);
@@ -33,9 +46,32 @@ export const App: React.FC = () => {
   const [checkIns, setCheckIns] = useState<CheckIn[]>(INITIAL_CHECKINS);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
 
-  // Filtros
+  // Filtros Globais
   const [selectedRegionId, setSelectedRegionId] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+
+  // Ao logar, define a aba inicial de acordo com o perfil
+  const handleLoginSuccess = (user: User) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    } catch (e) {
+      console.warn('Storage failed', e);
+    }
+
+    if (user.role === 'admin') {
+      setActiveTab('map');
+    } else if (user.role === 'coordenador') {
+      setActiveTab('coordinator-dashboard');
+    } else if (user.role === 'campo') {
+      setActiveTab('field-checkin');
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  };
 
   // Monitora Conectividade da Rede (Online/Offline)
   useEffect(() => {
@@ -54,30 +90,16 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // Muda de aba quando o papel (Role) for alterado
-  const handleRoleChange = (newRole: UserRole) => {
-    setCurrentRole(newRole);
-    if (newRole === 'coordenador') {
-      setActiveTab('coordinator-dashboard');
-    } else if (activeTab === 'coordinator-dashboard') {
-      setActiveTab('map');
-    }
-  };
-
   // Adiciona novo Check-in (seja online ou offline via PWA)
   const handleAddCheckIn = async (newCheckIn: CheckIn) => {
-    // Salva localmente no IndexedDB
     await saveCheckInOffline(newCheckIn);
-
-    // Atualiza estado do React
     setCheckIns((prev) => [newCheckIn, ...prev]);
 
-    // Registra Trilha de Auditoria
     const newLog: AuditLog = {
       id: `log-${Date.now()}`,
       userId: newCheckIn.coordinatorId,
       userName: newCheckIn.coordinatorName,
-      userRole: 'coordenador',
+      userRole: currentUser?.role || 'campo',
       action: 'CHECKIN_REGISTRADO',
       entity: 'CheckIn',
       entityId: newCheckIn.id,
@@ -93,13 +115,11 @@ export const App: React.FC = () => {
       prev.map((c) => (c.id === checkInId ? { ...c, status: newStatus, statusReason: reason } : c))
     );
 
-    const currentUser = users.find((u) => u.role === currentRole) || users[0];
-
     const auditLog: AuditLog = {
       id: `log-${Date.now()}`,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userRole: currentRole,
+      userId: currentUser?.id || 'admin',
+      userName: currentUser?.name || 'Super Admin',
+      userRole: currentUser?.role || 'admin',
       action: 'DECISAO_AUDITORIA',
       entity: 'CheckIn',
       entityId: checkInId,
@@ -121,12 +141,19 @@ export const App: React.FC = () => {
     );
   };
 
-  // Cálculo Dinâmico das Métricas KPIs Operacionais
+  // Se não estiver autenticado, exibe a Tela de Login
+  if (!currentUser) {
+    return <LoginScreen users={users} onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // Métricas e Contextos
   const activeCampaign = campaigns[0];
   const pendingSyncCount = checkIns.filter((c) => !c.synced).length;
 
   const filteredCheckIns = checkIns.filter((c) => {
-    const matchRegion = selectedRegionId === 'ALL' || actionPoints.find((p) => p.id === c.actionPointId)?.regionId === selectedRegionId;
+    const matchRegion =
+      selectedRegionId === 'ALL' ||
+      actionPoints.find((p) => p.id === c.actionPointId)?.regionId === selectedRegionId;
     const matchStatus = selectedStatus === 'ALL' || c.status === selectedStatus;
     return matchRegion && matchStatus;
   });
@@ -141,18 +168,17 @@ export const App: React.FC = () => {
     checkInsRejected: checkIns.filter((c) => c.status === 'rejeitado').length,
     pointsAttended: new Set(checkIns.map((c) => c.actionPointId)).size,
     pointsUnattended: actionPoints.length - new Set(checkIns.map((c) => c.actionPointId)).size,
-    pendingEvidences: checkIns.filter((c) => c.status === 'pendente_analise').length,
+    pendingEvidences: checkIns.filter((c) => c.status === 'pendente_analise').length
   };
 
-  const currentUser = users.find((u) => u.role === currentRole) || users[0];
+  const userRegion = regions.find((r) => r.id === currentUser.regionId);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-['Inter',sans-serif]">
-      
       {/* Navbar Superior */}
       <Navbar
-        currentRole={currentRole}
-        onRoleChange={handleRoleChange}
+        currentUser={currentUser}
+        onLogout={handleLogout}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         isOnline={isOnline}
@@ -160,24 +186,53 @@ export const App: React.FC = () => {
         onManualSync={autoSyncPendingCheckIns}
       />
 
-      {/* Conteúdo Principal conforme Perfil e Aba Ativa */}
+      {/* Conteúdo Principal de acordo com o Perfil */}
       <main className="flex-1">
-        {currentRole === 'coordenador' ? (
-          <div className="py-4">
-            <CoordinatorDashboard
-              currentUser={currentUser}
-              teams={teams}
-              actionPoints={actionPoints}
-              checkIns={checkIns}
-              campaignName={activeCampaign.name}
-              isOnline={isOnline}
-              onAddCheckIn={handleAddCheckIn}
-              onManualSync={autoSyncPendingCheckIns}
-            />
-          </div>
-        ) : (
+        {/* PERFIL 1: RESPONSÁVEL DE CAMPO */}
+        {currentUser.role === 'campo' && (
+          <FieldActionView
+            currentUser={currentUser}
+            teams={teams}
+            actionPoints={actionPoints}
+            checkIns={checkIns}
+            campaignName={activeCampaign.name}
+            isOnline={isOnline}
+            onAddCheckIn={handleAddCheckIn}
+            onManualSync={autoSyncPendingCheckIns}
+          />
+        )}
+
+        {/* PERFIL 2: COORDENADOR POR ZONA */}
+        {currentUser.role === 'coordenador' && (
           <div>
-            {/* Visualização de Dashboard KPIs + Mapa em Abas */}
+            {activeTab === 'coordinator-dashboard' && (
+              <CoordinatorDashboard
+                currentUser={currentUser}
+                teams={teams}
+                actionPoints={actionPoints}
+                checkIns={checkIns}
+                campaignName={activeCampaign.name}
+                isOnline={isOnline}
+                onAddCheckIn={handleAddCheckIn}
+                onManualSync={autoSyncPendingCheckIns}
+              />
+            )}
+
+            {activeTab === 'coordinator-actions' && (
+              <CoordinatorActionsPanel
+                currentUser={currentUser}
+                region={userRegion}
+                actionPoints={actionPoints}
+                teams={teams}
+                onAddActionPoint={(pt) => setActionPoints((prev) => [pt, ...prev])}
+              />
+            )}
+          </div>
+        )}
+
+        {/* PERFIL 3: SUPER ADMIN */}
+        {currentUser.role === 'admin' && (
+          <div>
             {activeTab === 'map' && (
               <div className="p-4 space-y-4 max-w-7xl mx-auto">
                 <AdminDashboard
@@ -210,19 +265,6 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'reports' && (
-              <div className="max-w-7xl mx-auto p-4 sm:p-6">
-                <ReportsPanel
-                  campaign={activeCampaign}
-                  teams={teams}
-                  actionPoints={actionPoints}
-                  checkIns={checkIns}
-                  metrics={metrics}
-                  generatedBy={currentUser.name}
-                />
-              </div>
-            )}
-
             {activeTab === 'management' && (
               <div className="max-w-7xl mx-auto p-4 sm:p-6">
                 <ManagementPanel
@@ -235,10 +277,22 @@ export const App: React.FC = () => {
                 />
               </div>
             )}
+
+            {activeTab === 'reports' && (
+              <div className="max-w-7xl mx-auto p-4 sm:p-6">
+                <ReportsPanel
+                  campaign={activeCampaign}
+                  teams={teams}
+                  actionPoints={actionPoints}
+                  checkIns={checkIns}
+                  metrics={metrics}
+                  generatedBy={currentUser.name}
+                />
+              </div>
+            )}
           </div>
         )}
       </main>
-
     </div>
   );
 };

@@ -1,13 +1,19 @@
-export type UserRole = 'admin' | 'coordenador' | 'auditor';
+export type UserRole = 'admin' | 'coordenador' | 'campo';
 
 export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string;
   role: UserRole;
   phone?: string;
   avatarUrl?: string;
   active: boolean;
+  regionId?: string; // Para coordenadores vinculados à zona
+  regionName?: string;
+  teamId?: string; // Para responsáveis de campo
+  teamName?: string;
+  assignedActionPointIds?: string[];
 }
 
 export interface Campaign {
