@@ -175,7 +175,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess 
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-slate-200">📍 Coordenador por Zona</div>
-                    <div className="text-[11px] text-slate-400">Carlos Mendes • {coordUser.regionName || 'Zona Norte'}</div>
+                    <div className="text-[11px] text-slate-400">{coordUser.name} • {coordUser.regionName || 'Manaus'}</div>
                   </div>
                 </div>
                 <span className="text-[11px] font-medium text-amber-400 group-hover:translate-x-0.5 transition-transform">Entrar →</span>
@@ -194,7 +194,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess 
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-slate-200">📱 Responsável de Campo</div>
-                    <div className="text-[11px] text-slate-400">Lucas Oliveira • Check-in & Evidências</div>
+                    <div className="text-[11px] text-slate-400">{campoUser.name} • {campoUser.regionName || 'Manaus'}</div>
                   </div>
                 </div>
                 <span className="text-[11px] font-medium text-emerald-400 group-hover:translate-x-0.5 transition-transform">Entrar →</span>
