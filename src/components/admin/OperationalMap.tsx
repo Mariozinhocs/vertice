@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import { Team, ActionPoint, CheckIn, CheckInStatus } from '../../types';
-import { MapPin, CheckCircle2, AlertTriangle, XCircle, Clock, Users, Camera, X, Shield, Navigation } from 'lucide-react';
+import { MapPin, CheckCircle2, AlertTriangle, XCircle, Clock, Users, Camera, X, Shield, Navigation, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface OperationalMapProps {
@@ -13,12 +13,13 @@ interface OperationalMapProps {
 }
 
 // Criação de Ícones customizados do Leaflet em SVG para cada status
-const createStatusMarkerIcon = (status: CheckInStatus | 'no_checkin') => {
+const createStatusMarkerIcon = (status: CheckInStatus | 'no_checkin' | 'point_fixed') => {
   let colorHex = '#64748b'; // Slate 500
   if (status === 'validado') colorHex = '#10b981'; // Emerald 500
   else if (status === 'pendente_analise') colorHex = '#f59e0b'; // Amber 500
   else if (status === 'rejeitado') colorHex = '#f43f5e'; // Rose 500
   else if (status === 'pendente_sync') colorHex = '#6366f1'; // Indigo 500
+  else if (status === 'point_fixed') colorHex = '#8b5cf6'; // Violet 500
 
   const svgHtml = `
     <div style="
@@ -30,12 +31,13 @@ const createStatusMarkerIcon = (status: CheckInStatus | 'no_checkin') => {
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-      border: 2px solid white;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      border: 2.5px solid white;
+      cursor: pointer;
     ">
       <div style="
-        width: 12px;
-        height: 12px;
+        width: 10px;
+        height: 10px;
         background-color: white;
         border-radius: 50%;
       "></div>
@@ -58,27 +60,40 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
   onAuditCheckIn
 }) => {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [selectedPoint, setSelectedPoint] = useState<ActionPoint | null>(null);
   const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState<boolean>(false);
 
-  // Centro padrão do mapa (São Paulo por padrão ou média das coordenadas)
+  // Centro padrão do mapa (Manaus - AM por padrão)
   const defaultCenter: [number, number] = actionPoints[0]
     ? [actionPoints[0].latitude, actionPoints[0].longitude]
-    : [-23.550520, -46.633308];
+    : [-3.1190, -60.0217];
 
-  const handleSelectMarker = (team: Team, checkIn: CheckIn | null) => {
+  const handleSelectTeamMarker = (team: Team, checkIn: CheckIn | null) => {
     setSelectedTeam(team);
     setSelectedCheckIn(checkIn);
+    const point = actionPoints.find((p) => p.id === checkIn?.actionPointId || team.assignedPointIds.includes(p.id));
+    setSelectedPoint(point || null);
   };
 
+  const handleSelectPointMarker = (point: ActionPoint) => {
+    setSelectedPoint(point);
+    const team = teams.find((t) => t.assignedPointIds.includes(point.id));
+    setSelectedTeam(team || null);
+    const checkIn = checkIns.find((c) => c.actionPointId === point.id);
+    setSelectedCheckIn(checkIn || null);
+  };
+
+  const isDrawerOpen = selectedTeam !== null || selectedPoint !== null;
+
   return (
-    <div className="relative w-full h-[calc(100vh-4rem)] bg-slate-950 flex">
+    <div className="relative w-full h-[calc(100vh-4rem)] bg-slate-950 flex font-['Inter',sans-serif]">
       
       {/* Mapa Leaflet */}
       <div className="flex-1 h-full z-10">
         <MapContainer
           center={defaultCenter}
-          zoom={13}
+          zoom={12}
           scrollWheelZoom={true}
           style={{ width: '100%', height: '100%' }}
         >
@@ -88,45 +103,54 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
           />
 
           {/* Círculos de Raio dos Pontos de Atuação */}
-          {actionPoints.map((point) => (
-            <React.Fragment key={`point-${point.id}`}>
-              <Circle
-                center={[point.latitude, point.longitude]}
-                radius={point.radiusMeters}
-                pathOptions={{
-                  color: '#6366f1',
-                  fillColor: '#6366f1',
-                  fillOpacity: 0.15,
-                  weight: 2,
-                  dashArray: '4, 8'
-                }}
-              />
-              {/* Marcador Fixo do Ponto de Atuação */}
-              <Marker
-                position={[point.latitude, point.longitude]}
-                icon={createStatusMarkerIcon('no_checkin')}
-              >
-                <Popup className="custom-popup">
-                  <div className="p-1 text-slate-900 text-xs">
-                    <strong className="block font-bold">{point.name}</strong>
-                    <p className="text-slate-600">{point.address}</p>
-                    <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded mt-1 inline-block">
-                      Raio: {point.radiusMeters}m
-                    </span>
-                  </div>
-                </Popup>
-              </Marker>
-            </React.Fragment>
-          ))}
+          {actionPoints.map((point) => {
+            const hasCheckIn = checkIns.some((c) => c.actionPointId === point.id && c.status === 'validado');
+            return (
+              <React.Fragment key={`point-${point.id}`}>
+                <Circle
+                  center={[point.latitude, point.longitude]}
+                  radius={point.radiusMeters}
+                  pathOptions={{
+                    color: hasCheckIn ? '#10b981' : '#6366f1',
+                    fillColor: hasCheckIn ? '#10b981' : '#6366f1',
+                    fillOpacity: 0.15,
+                    weight: 2,
+                    dashArray: '4, 8'
+                  }}
+                />
+                {/* Marcador Fixo do Ponto de Atuação */}
+                <Marker
+                  position={[point.latitude, point.longitude]}
+                  icon={createStatusMarkerIcon(hasCheckIn ? 'validado' : 'point_fixed')}
+                  eventHandlers={{
+                    click: () => handleSelectPointMarker(point),
+                  }}
+                >
+                  <Popup className="custom-popup">
+                    <div className="p-1.5 text-slate-900 text-xs space-y-1">
+                      <strong className="block font-bold text-sm">{point.name}</strong>
+                      <p className="text-slate-600 text-[11px]">{point.address}</p>
+                      <div className="flex items-center gap-1 text-[10px] text-indigo-700 font-bold">
+                        <span>Raio: {point.radiusMeters}m</span>
+                        {hasCheckIn && <span className="text-emerald-700 bg-emerald-100 px-1 rounded">✓ Atendido</span>}
+                      </div>
+                      <p className="text-[10px] text-indigo-600 font-semibold pt-0.5">Clique para ver detalhes completos →</p>
+                    </div>
+                  </Popup>
+                </Marker>
+              </React.Fragment>
+            );
+          })}
 
           {/* Marcadores das Equipes e seus Check-ins */}
           {teams.map((team) => {
             const checkIn = checkIns.find((c) => c.teamId === team.id);
             const assignedPoint = actionPoints.find((p) => team.assignedPointIds.includes(p.id));
 
-            // Usa coordenada do check-in ou do ponto atribuído
-            const lat = checkIn ? checkIn.latitude : assignedPoint?.latitude || defaultCenter[0];
-            const lng = checkIn ? checkIn.longitude : assignedPoint?.longitude || defaultCenter[1];
+            if (!checkIn && !assignedPoint) return null;
+
+            const lat = checkIn ? checkIn.latitude : assignedPoint!.latitude;
+            const lng = checkIn ? checkIn.longitude : assignedPoint!.longitude;
             const status = checkIn ? checkIn.status : 'no_checkin';
 
             return (
@@ -135,7 +159,7 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
                 position={[lat, lng]}
                 icon={createStatusMarkerIcon(status)}
                 eventHandlers={{
-                  click: () => handleSelectMarker(team, checkIn || null),
+                  click: () => handleSelectTeamMarker(team, checkIn || null),
                 }}
               >
                 <Popup>
@@ -153,35 +177,74 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
         </MapContainer>
       </div>
 
-      {/* Painel Lateral (Drawer) de Detalhes da Equipe Selecionada */}
-      {selectedTeam && (
+      {/* Painel Lateral (Drawer) de Detalhes da Ação / Equipe Selecionada */}
+      {isDrawerOpen && (
         <div className="w-80 sm:w-96 bg-slate-900 border-l border-slate-800 h-full p-5 overflow-y-auto z-20 shadow-2xl space-y-5 animate-in slide-in-from-right duration-200">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Raio-X da Equipe</span>
-              <h3 className="text-base font-extrabold text-white">{selectedTeam.name}</h3>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+                {selectedCheckIn ? 'Evidência & Ação' : 'Ponto de Ação Previsto'}
+              </span>
+              <h3 className="text-base font-extrabold text-white">
+                {selectedPoint?.name || selectedTeam?.name || 'Detalhes da Ação'}
+              </h3>
             </div>
             <button
               onClick={() => {
                 setSelectedTeam(null);
+                setSelectedPoint(null);
                 setSelectedCheckIn(null);
               }}
-              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+              className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-all text-xs"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Dados do Coordenador */}
-          <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
-            <div className="flex items-center space-x-2 text-slate-300">
-              <Users className="w-4 h-4 text-indigo-400" />
-              <span className="font-semibold">Coordenador: {selectedTeam.coordinatorName}</span>
+          {/* Dados do Ponto de Atuação */}
+          {selectedPoint && (
+            <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+              <div className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-white text-xs">{selectedPoint.name}</h4>
+                  <p className="text-[11px] text-slate-400">{selectedPoint.address}</p>
+                </div>
+              </div>
+              <div className="flex justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                <span>GPS: {selectedPoint.latitude.toFixed(4)}, {selectedPoint.longitude.toFixed(4)}</span>
+                <span className="text-indigo-400 font-bold">Raio: {selectedPoint.radiusMeters}m</span>
+              </div>
             </div>
-            <p className="text-slate-400 text-[11px]">Integrantes da equipe: {selectedTeam.members.length} pessoas</p>
-          </div>
+          )}
 
-          {/* Status do Check-in */}
+          {/* Dados da Equipe e Coordenador */}
+          {selectedTeam && (
+            <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-slate-300">
+                  <Users className="w-4 h-4 text-indigo-400" />
+                  <span className="font-bold text-white">{selectedTeam.name}</span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+                  {selectedTeam.status.toUpperCase()}
+                </span>
+              </div>
+              <p className="text-slate-400 text-[11px]">
+                Coordenador: <strong className="text-slate-200">{selectedTeam.coordinatorName}</strong>
+              </p>
+              <div className="pt-1.5 border-t border-slate-800 flex flex-wrap gap-1 text-[10px]">
+                <span className="text-slate-500">Membros:</span>
+                {selectedTeam.members.map((m) => (
+                  <span key={m.id} className="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-slate-300">
+                    {m.name} ({m.role})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Status do Check-in e Evidência */}
           {selectedCheckIn ? (
             <div className="space-y-4">
               <div
@@ -204,10 +267,6 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
 
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs text-slate-300">
                 <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Ponto Atribuído:</span>
-                  <span className="font-bold text-white">{selectedCheckIn.pointName}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
                   <span className="text-slate-400">Horário Check-in:</span>
                   <span className="font-bold text-white">{format(new Date(selectedCheckIn.timestamp), 'HH:mm:ss')}</span>
                 </div>
@@ -224,7 +283,9 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
               {/* Evidência Fotográfica com Marca d'água */}
               {selectedCheckIn.imageWatermarkUrl && (
                 <div className="space-y-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Evidência Fotográfica com Carimbo</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                    Evidência Fotográfica Georreferenciada
+                  </span>
                   <div
                     onClick={() => setShowPhotoModal(true)}
                     className="relative rounded-xl overflow-hidden border border-slate-700 cursor-pointer group shadow-lg"
@@ -234,9 +295,9 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
                       alt="Evidência Fotográfica"
                       className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-200"
                     />
-                    <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold space-x-1">
+                    <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold space-x-1.5 backdrop-blur-[2px]">
                       <Camera className="w-4 h-4" />
-                      <span>Clique para Ampliar</span>
+                      <span>Clique para Ampliar Foto</span>
                     </div>
                   </div>
                 </div>
@@ -249,13 +310,13 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => onAuditCheckIn(selectedCheckIn.id, 'validado', 'Aprovado manualmente pelo auditor.')}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 rounded-lg"
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 rounded-lg transition-all shadow"
                     >
                       Aprovar
                     </button>
                     <button
                       onClick={() => onAuditCheckIn(selectedCheckIn.id, 'rejeitado', 'Rejeitado por divergência pelo auditor.')}
-                      className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2 rounded-lg"
+                      className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2 rounded-lg transition-all shadow"
                     >
                       Rejeitar
                     </button>
@@ -267,7 +328,7 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
           ) : (
             <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 text-center text-xs text-slate-400 space-y-2">
               <Clock className="w-6 h-6 text-slate-600 mx-auto" />
-              <p>Esta equipe ainda não realizou check-in no dia de hoje.</p>
+              <p>Ainda não há check-in registrado neste ponto de ação hoje.</p>
             </div>
           )}
 

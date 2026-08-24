@@ -11,6 +11,7 @@ import {
 } from './services/mockData';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { Navbar } from './components/layout/Navbar';
+import { EditProfileModal } from './components/profile/EditProfileModal';
 import { CoordinatorDashboard } from './components/coordinator/CoordinatorDashboard';
 import { CoordinatorActionsPanel } from './components/coordinator/CoordinatorActionsPanel';
 import { FieldActionView } from './components/field/FieldActionView';
@@ -34,11 +35,12 @@ export const App: React.FC = () => {
     }
   });
 
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('map');
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
   // Entidades Globais
-  const [users] = useState<User[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [campaigns] = useState<Campaign[]>(INITIAL_CAMPAIGNS);
   const [regions] = useState<Region[]>(INITIAL_REGIONS);
   const [actionPoints, setActionPoints] = useState<ActionPoint[]>(INITIAL_ACTION_POINTS);
@@ -73,6 +75,43 @@ export const App: React.FC = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
   };
 
+  // Atualização do Perfil
+  const handleUpdateProfile = (updatedUser: User) => {
+    setCurrentUser(updatedUser);
+    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+    try {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
+    } catch (e) {
+      console.warn('Storage failed', e);
+    }
+  };
+
+  // Mutações de Pontos de Atuação
+  const handleAddActionPoint = (point: ActionPoint) => {
+    setActionPoints((prev) => [point, ...prev]);
+  };
+
+  const handleUpdateActionPoint = (updatedPoint: ActionPoint) => {
+    setActionPoints((prev) => prev.map((p) => (p.id === updatedPoint.id ? updatedPoint : p)));
+  };
+
+  const handleDeleteActionPoint = (pointId: string) => {
+    setActionPoints((prev) => prev.filter((p) => p.id !== pointId));
+  };
+
+  // Mutações de Equipes
+  const handleAddTeam = (team: Team) => {
+    setTeams((prev) => [team, ...prev]);
+  };
+
+  const handleUpdateTeam = (updatedTeam: Team) => {
+    setTeams((prev) => prev.map((t) => (t.id === updatedTeam.id ? updatedTeam : t)));
+  };
+
+  const handleDeleteTeam = (teamId: string) => {
+    setTeams((prev) => prev.filter((t) => t.id !== teamId));
+  };
+
   // Monitora Conectividade da Rede (Online/Offline)
   useEffect(() => {
     const handleOnline = () => {
@@ -90,7 +129,7 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // Adiciona novo Check-in (seja online ou offline via PWA)
+  // Adiciona novo Check-in
   const handleAddCheckIn = async (newCheckIn: CheckIn) => {
     await saveCheckInOffline(newCheckIn);
     setCheckIns((prev) => [newCheckIn, ...prev]);
@@ -179,12 +218,22 @@ export const App: React.FC = () => {
       <Navbar
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenEditProfile={() => setIsEditProfileOpen(true)}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         isOnline={isOnline}
         pendingSyncCount={pendingSyncCount}
         onManualSync={autoSyncPendingCheckIns}
       />
+
+      {/* Modal de Edição de Perfil */}
+      {isEditProfileOpen && (
+        <EditProfileModal
+          currentUser={currentUser}
+          onClose={() => setIsEditProfileOpen(false)}
+          onSave={handleUpdateProfile}
+        />
+      )}
 
       {/* Conteúdo Principal de acordo com o Perfil */}
       <main className="flex-1">
@@ -224,7 +273,7 @@ export const App: React.FC = () => {
                 region={userRegion}
                 actionPoints={actionPoints}
                 teams={teams}
-                onAddActionPoint={(pt) => setActionPoints((prev) => [pt, ...prev])}
+                onAddActionPoint={handleAddActionPoint}
               />
             )}
           </div>
@@ -245,6 +294,7 @@ export const App: React.FC = () => {
                   onRegionChange={setSelectedRegionId}
                   selectedStatus={selectedStatus}
                   onStatusChange={setSelectedStatus}
+                  onNavigateToAudit={() => setActiveTab('audit')}
                 />
                 <OperationalMap
                   teams={teams}
@@ -272,8 +322,12 @@ export const App: React.FC = () => {
                   teams={teams}
                   regions={regions}
                   users={users}
-                  onAddActionPoint={(pt) => setActionPoints((prev) => [pt, ...prev])}
-                  onAddTeam={(tm) => setTeams((prev) => [tm, ...prev])}
+                  onAddActionPoint={handleAddActionPoint}
+                  onUpdateActionPoint={handleUpdateActionPoint}
+                  onDeleteActionPoint={handleDeleteActionPoint}
+                  onAddTeam={handleAddTeam}
+                  onUpdateTeam={handleUpdateTeam}
+                  onDeleteTeam={handleDeleteTeam}
                 />
               </div>
             )}

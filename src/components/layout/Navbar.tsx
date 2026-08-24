@@ -1,10 +1,11 @@
 import React from 'react';
 import { User, UserRole } from '../../types';
-import { Shield, MapPin, Users, FileText, Wifi, WifiOff, RefreshCw, Smartphone, Monitor, LogOut, PlusCircle } from 'lucide-react';
+import { Shield, MapPin, Users, FileText, Wifi, WifiOff, RefreshCw, Smartphone, Monitor, LogOut, PlusCircle, UserCheck } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: User;
   onLogout: () => void;
+  onOpenEditProfile?: () => void;
   activeTab: string;
   onTabChange: (tab: string) => void;
   isOnline: boolean;
@@ -15,6 +16,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   onLogout,
+  onOpenEditProfile,
   activeTab,
   onTabChange,
   isOnline,
@@ -36,29 +38,44 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const badge = getRoleBadge();
 
+  const handleLogoClick = () => {
+    if (currentUser.role === 'admin') {
+      onTabChange('map');
+    } else if (currentUser.role === 'coordenador') {
+      onTabChange('coordinator-dashboard');
+    } else {
+      onTabChange('field-checkin');
+    }
+  };
+
   return (
-    <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+    <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 font-['Inter',sans-serif]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           
-          {/* Logo & Brand */}
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-indigo-400 p-0.5 shadow-lg shadow-indigo-500/20 flex items-center justify-center">
+          {/* Logo & Brand - Agora Clicável para o Início / Mapa Geral */}
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="flex items-center space-x-3 text-left group focus:outline-none"
+            title="Ir para o Mapa Geral (Início)"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-indigo-400 p-0.5 shadow-lg shadow-indigo-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
               <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
                 <Shield className="w-4 h-4 text-indigo-400" />
               </div>
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent">
+                <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent group-hover:text-white transition-colors">
                   VÉRTICE
                 </span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wider hidden sm:inline-block">
-                  Plataforma
+                  Manaus 2026
                 </span>
               </div>
             </div>
-          </div>
+          </button>
 
           {/* Navigation Tabs baseadas no Perfil Logado */}
           <nav className="hidden md:flex items-center space-x-1">
@@ -182,20 +199,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            {/* Profile Info & Badge */}
-            <div className="flex items-center space-x-2 bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
+            {/* Profile Info & Badge - Clicável para Editar Perfil */}
+            <button
+              type="button"
+              onClick={onOpenEditProfile}
+              className="flex items-center space-x-2 bg-slate-950/80 hover:bg-slate-800/80 px-2.5 py-1 rounded-xl border border-slate-800 hover:border-indigo-500/50 transition-all text-left group"
+              title="Clique para editar seu perfil"
+            >
               <img
                 src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150'}
                 alt={currentUser.name}
-                className="w-6 h-6 rounded-full object-cover border border-slate-700"
+                className="w-6 h-6 rounded-full object-cover border border-slate-700 group-hover:border-indigo-400 transition-colors"
               />
               <div className="hidden sm:block text-left">
-                <div className="text-xs font-semibold text-white leading-tight">{currentUser.name}</div>
+                <div className="text-xs font-semibold text-white group-hover:text-indigo-300 leading-tight transition-colors">
+                  {currentUser.name}
+                </div>
                 <div className={`text-[10px] font-medium px-1.5 py-0.2 rounded border inline-block ${badge.bg}`}>
                   {badge.label}
                 </div>
               </div>
-            </div>
+            </button>
 
             {/* Logout Button */}
             <button
