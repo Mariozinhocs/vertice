@@ -25,11 +25,35 @@ export const TeamModal: React.FC<TeamModalProps> = ({
 
   const coordinators = users.filter((u) => u.role === 'coordenador');
 
+  const getCoordForRegion = (regId: string) => coordinators.find((c) => c.regionId === regId);
+  const getRegionForCoord = (coordId: string) => {
+    const c = coordinators.find((coord) => coord.id === coordId);
+    return c?.regionId ? regions.find((r) => r.id === c.regionId) : null;
+  };
+
+  const initialRegionId = team?.regionId || regions[0]?.id || '';
+  const initialCoordId = team?.coordinatorId || getCoordForRegion(initialRegionId)?.id || coordinators[0]?.id || '';
+
   const [name, setName] = useState(team?.name || '');
-  const [regionId, setRegionId] = useState(team?.regionId || regions[0]?.id || 'reg-norte-1');
-  const [coordinatorId, setCoordinatorId] = useState(
-    team?.coordinatorId || coordinators[0]?.id || ''
-  );
+  const [regionId, setRegionId] = useState(initialRegionId);
+  const [coordinatorId, setCoordinatorId] = useState(initialCoordId);
+
+  const handleRegionChange = (newRegionId: string) => {
+    setRegionId(newRegionId);
+    const matchingCoord = getCoordForRegion(newRegionId);
+    if (matchingCoord) {
+      setCoordinatorId(matchingCoord.id);
+    }
+  };
+
+  const handleCoordinatorChange = (newCoordId: string) => {
+    setCoordinatorId(newCoordId);
+    const matchingRegion = getRegionForCoord(newCoordId);
+    if (matchingRegion) {
+      setRegionId(matchingRegion.id);
+    }
+  };
+
   const [assignedPointIds, setAssignedPointIds] = useState<string[]>(
     team?.assignedPointIds || []
   );
@@ -54,6 +78,47 @@ export const TeamModal: React.FC<TeamModalProps> = ({
   const handleUpdateMember = (id: string, field: keyof TeamMember, value: string) => {
     setMembers((prev) =>
       prev.map((m) => (m.id === id ? { ...m, [field]: value } : m))
+    );
+  };
+
+  const getRoleLabel = (user: User): string => {
+    if (user.role === 'admin') return 'Super Admin';
+    if (user.role === 'coordenador') return 'Coordenador';
+    if (user.role === 'campo') return 'Responsável de Campo';
+    return 'Mobilizador(a)';
+  };
+
+  const handleMemberNameChange = (id: string, nameValue: string) => {
+    const matchedUser = users.find(
+      (u) =>
+        u.name.toLowerCase() === nameValue.trim().toLowerCase() ||
+        (u.username && u.username.toLowerCase() === nameValue.trim().toLowerCase())
+    );
+
+    setMembers((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        return {
+          ...m,
+          name: nameValue,
+          role: matchedUser ? getRoleLabel(matchedUser) : m.role,
+          phone: matchedUser?.phone || m.phone
+        };
+      })
+    );
+  };
+
+  const handleSelectRegisteredUser = (memberId: string, selectedUser: User) => {
+    setMembers((prev) =>
+      prev.map((m) => {
+        if (m.id !== memberId) return m;
+        return {
+          ...m,
+          name: selectedUser.name,
+          role: getRoleLabel(selectedUser),
+          phone: selectedUser.phone || ''
+        };
+      })
     );
   };
 
@@ -140,7 +205,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({
               <label className="text-slate-300 font-medium">Zona / Região</label>
               <select
                 value={regionId}
-                onChange={(e) => setRegionId(e.target.value)}
+                onChange={(e) => handleRegionChange(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
               >
                 {regions.map((reg) => (
@@ -157,7 +222,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({
               <label className="text-slate-300 font-medium">Coordenador Responsável</label>
               <select
                 value={coordinatorId}
-                onChange={(e) => setCoordinatorId(e.target.value)}
+                onChange={(e) => handleCoordinatorChange(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
               >
                 {coordinators.map((c) => (
@@ -198,42 +263,57 @@ export const TeamModal: React.FC<TeamModalProps> = ({
             </div>
 
             <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {members.map((m, index) => (
+              {members.map((m) => (
                 <div
                   key={m.id}
-                  className="flex items-center gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800"
+                  className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800"
                 >
-                  <input
-                    type="text"
-                    required
-                    value={m.name}
-                    onChange={(e) => handleUpdateMember(m.id, 'name', e.target.value)}
-                    placeholder="Nome do integrante"
-                    className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white text-xs"
-                  />
-                  <input
-                    type="text"
-                    value={m.role}
-                    onChange={(e) => handleUpdateMember(m.id, 'role', e.target.value)}
-                    placeholder="Função (Ex: Líder / Panfleteiro)"
-                    className="w-36 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white text-xs"
-                  />
-                  <input
-                    type="text"
-                    value={m.phone || ''}
-                    onChange={(e) => handleUpdateMember(m.id, 'phone', e.target.value)}
-                    placeholder="(92) 99999-9999"
-                    className="w-32 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white text-xs"
-                  />
-                  {members.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMember(m.id)}
-                      className="text-red-400 hover:text-red-300 p-1 rounded"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <div className="flex-1 flex gap-1.5 items-center">
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        required
+                        list={`user-suggestions-${m.id}`}
+                        value={m.name}
+                        onChange={(e) => handleMemberNameChange(m.id, e.target.value)}
+                        placeholder="Nome do integrante"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white text-xs focus:outline-none focus:border-indigo-500"
+                      />
+                      <datalist id={`user-suggestions-${m.id}`}>
+                        {users.map((u) => (
+                          <option key={u.id} value={u.name}>
+                            {u.username ? `@${u.username} • ` : ''}{u.role} {u.phone ? `(${u.phone})` : ''}
+                          </option>
+                        ))}
+                      </datalist>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={m.role}
+                      onChange={(e) => handleUpdateMember(m.id, 'role', e.target.value)}
+                      placeholder="Função (Ex: Líder / Mobilizador)"
+                      className="w-32 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white text-xs"
+                    />
+                    <input
+                      type="text"
+                      value={m.phone || ''}
+                      onChange={(e) => handleUpdateMember(m.id, 'phone', e.target.value)}
+                      placeholder="(92) 99999-9999"
+                      className="w-28 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white text-xs font-mono"
+                    />
+                    {members.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMember(m.id)}
+                        className="text-red-400 hover:text-red-300 p-1 rounded"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

@@ -1,4 +1,4 @@
-# Script de Deploy Automatizado Hostinger Staging (/hml) - Vértice
+# Script de Deploy Automatizado Hostinger HML (/hml) - Vértice
 # Squad A-Team | Vértice AI
 
 $env:Path = "C:\Program Files\nodejs;" + $env:Path
@@ -7,15 +7,15 @@ $FtpServer   = "ftp.vertice.hubdigital360.com"
 $FtpUser     = "u576215103.vertica"
 $FtpPass     = "*9t5*OvjXF"
 $FtpRemoteDir= "/hml"
-$StagingUrl  = "https://vertice.hubdigital360.com/hml"
+$HmlUrl      = "https://vertice.hubdigital360.com/hml"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " 🚀 DEPLOY DE HOMOLOGAÇÃO: $StagingUrl " -ForegroundColor Cyan
+Write-Host " 📋 DEPLOY DO AMBIENTE HML: $HmlUrl " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 1. Compila o PWA Frontend com Vite no SSD Local (evita travamentos no Google Drive)
 Write-Host "`n[1/3] Compilando Frontend React em disco SSD local..." -ForegroundColor Yellow
-$tempBuild = Join-Path $env:TEMP "vertice_build"
+$tempBuild = Join-Path $env:TEMP "vertice_build_hml"
 if (Test-Path $tempBuild) { Remove-Item -Recurse -Force $tempBuild -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Path $tempBuild -Force | Out-Null
 
@@ -27,21 +27,23 @@ $npxCmd = "C:\Program Files\nodejs\npx.cmd"
 Push-Location $tempBuild
 try {
     if (Test-Path $npmCmd) { & $npmCmd install --no-audit --no-fund } else { npm install --no-audit --no-fund }
+    $env:VITE_APP_ENV = "hml"
+    $env:VITE_SHOW_DEMO = "true"
     if (Test-Path $npxCmd) { & $npxCmd vite build } else { npx vite build }
 } finally {
     Pop-Location
 }
 
 if (-not (Test-Path "$tempBuild\dist")) {
-    Write-Host "❌ Erro ao compilar o frontend React com Vite." -ForegroundColor Red
+    Write-Host "❌ Erro ao compilar o frontend React com Vite para HML." -ForegroundColor Red
     exit 1
 }
 
-if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" -ErrorAction SilentlyContinue }
-Copy-Item -Recurse -Force "$tempBuild\dist" "dist"
+if (Test-Path "dist_hml") { Remove-Item -Recurse -Force "dist_hml" -ErrorAction SilentlyContinue }
+Copy-Item -Recurse -Force "$tempBuild\dist" "dist_hml"
 
 # 2. Prepara Pasta de Pacote de Deploy
-$deployDir = "deploy_package"
+$deployDir = "deploy_package_hml"
 if (Test-Path $deployDir) {
     Remove-Item -Recurse -Force $deployDir
 }
@@ -50,8 +52,8 @@ New-Item -ItemType Directory -Path $deployDir | Out-Null
 New-Item -ItemType Directory -Path "$deployDir/api" | Out-Null
 New-Item -ItemType Directory -Path "$deployDir/api/uploads/evidencias" | Out-Null
 
-Write-Host "`n[2/3] Copiando arquivos estáticos do Frontend (/dist -> /deploy_package)..." -ForegroundColor Yellow
-Copy-Item -Recurse -Force "dist/*" "$deployDir/"
+Write-Host "`n[2/3] Copiando arquivos estáticos do Frontend (/dist_hml -> /deploy_package_hml)..." -ForegroundColor Yellow
+Copy-Item -Recurse -Force "dist_hml/*" "$deployDir/"
 
 Write-Host "`n[3/3] Copiando API REST em PHP 8 com credenciais da Hostinger..." -ForegroundColor Yellow
 Copy-Item -Recurse -Force "api/*" "$deployDir/api/"
@@ -73,7 +75,7 @@ function Ensure-FtpDirectory($remoteUrl, $username, $password) {
         $resp = $makeDirReq.GetResponse()
         $resp.Close()
     } catch {
-        # Diretório já existe ou criado
+        # Diretório já existe ou foi criado
     }
 }
 
@@ -116,6 +118,6 @@ $baseUrl = "ftp://$FtpServer$FtpRemoteDir"
 Upload-FtpDirectory -localPath $deployDir -remoteUrl $baseUrl -username $FtpUser -password $FtpPass
 
 Write-Host "`n==========================================================" -ForegroundColor Green
-Write-Host " ✅ DEPLOY DE HOMOLOGAÇÃO FINALIZADO COM SUCESSO! " -ForegroundColor Green
-Write-Host " 🌐 Acesse: $StagingUrl " -ForegroundColor Green
+Write-Host " ✅ DEPLOY DO AMBIENTE HML FINALIZADO COM SUCESSO! " -ForegroundColor Green
+Write-Host " 📋 Acesse: $HmlUrl " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green

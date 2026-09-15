@@ -1,17 +1,32 @@
 import React, { useState } from 'react';
-import { User, UserRole } from '../../types';
-import { Shield, Lock, Mail, ArrowRight, UserCheck, MapPin, Sparkles, AlertCircle } from 'lucide-react';
+import { User } from '../../types';
+import { Shield, Lock, ArrowRight, UserCheck, MapPin, Sparkles, AlertCircle, User as UserIcon, TestTube, Key } from 'lucide-react';
+import { showDemoQuickAccess, getEnvironment } from '../../config/environment';
+import { FieldDisclaimerModal } from './FieldDisclaimerModal';
 
 interface LoginScreenProps {
   users: User[];
   onLoginSuccess: (user: User) => void;
+  showDemoAccess?: boolean;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
+export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess, showDemoAccess }) => {
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingDisclaimerUser, setPendingDisclaimerUser] = useState<User | null>(null);
+
+  const env = getEnvironment();
+  const shouldShowDemo = showDemoAccess !== undefined ? showDemoAccess : showDemoQuickAccess();
+
+  const processUserLogin = (userToLogin: User) => {
+    if (userToLogin.role === 'campo') {
+      setPendingDisclaimerUser(userToLogin);
+    } else {
+      onLoginSuccess(userToLogin);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,12 +34,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess 
     setIsLoading(true);
 
     setTimeout(() => {
-      const foundUser = users.find(
-        (u) => u.email.toLowerCase() === email.trim().toLowerCase()
-      );
+      const term = identifier.trim().toLowerCase();
+      const foundUser =
+        users.find((u) => u.username && u.username.toLowerCase() === term) ||
+        users.find((u) => u.email && u.email.toLowerCase() === term) ||
+        users.find((u) => u.name && u.name.toLowerCase() === term) ||
+        users.find((u) => u.name && u.name.toLowerCase().includes(term));
 
       if (!foundUser) {
-        setError('Usuário não encontrado. Verifique o e-mail digitado.');
+        setError('Usuário não encontrado. Verifique o nome ou e-mail digitado.');
         setIsLoading(false);
         return;
       }
@@ -36,20 +54,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess 
       }
 
       setIsLoading(false);
-      onLoginSuccess(foundUser);
+      processUserLogin(foundUser);
     }, 400);
   };
 
   const handleQuickLogin = (demoUser: User) => {
-    setEmail(demoUser.email);
+    setIdentifier(demoUser.email || demoUser.name);
     setPassword(demoUser.password || '123456');
     setError(null);
-    onLoginSuccess(demoUser);
+    processUserLogin(demoUser);
   };
 
-  const superAdminUser = users.find((u) => u.role === 'admin');
-  const coordUser = users.find((u) => u.role === 'coordenador');
-  const campoUser = users.find((u) => u.role === 'campo');
+  const superAdminUser = users.find((u) => u.name === 'Mario Henrique' || u.username === 'mario.henrique') || users.find((u) => u.role === 'admin');
+  const gestorUser = users.find((u) => u.role === 'gestor_acesso') || users.find((u) => u.username === 'gabriel.acessos');
+  const coordUser = users.find((u) => u.name === 'Marcelo Campbell' || u.username === 'marcelo.campbell') || users.find((u) => u.role === 'coordenador');
+  const campoUser = users.find((u) => u.name === 'Mario' || u.username === 'mario') || users.find((u) => u.role === 'campo');
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden font-['Inter',sans-serif]">
@@ -71,6 +90,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess 
           <p className="text-xs sm:text-sm text-slate-400 font-medium">
             Plataforma Integrada de Gestão e Auditoria de Ações
           </p>
+
+          {/* Badge Indicador de Ambiente LAB / Homologação (quando em ambiente LAB) */}
+          {env === 'lab' && (
+            <div className="pt-1">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold shadow-sm">
+                <TestTube className="w-3.5 h-3.5 text-amber-400" />
+                <span>Ambiente LAB / Homologação</span>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Card do Formulário */}
@@ -89,15 +118,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess 
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">E-mail corporativo</label>
+              <label className="text-xs font-medium text-slate-300">Nome de Usuário ou E-mail</label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <UserIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
-                  type="email"
+                  type="text"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ex: seu.nome@vertice.com"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Digite seu nome de usuário ou e-mail"
                   className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
                 />
               </div>
@@ -134,73 +163,98 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess 
             </button>
           </form>
 
-          {/* Divisor */}
-          <div className="relative flex items-center justify-center">
-            <div className="border-t border-slate-800 w-full" />
-            <span className="bg-slate-900 px-3 text-[11px] font-medium text-slate-500 uppercase tracking-wider absolute">
-              Acesso Rápido de Demonstração
-            </span>
-          </div>
+          {/* Exibe o Acesso Rápido APENAS em ambiente LAB / Dev ou quando explicitamente ativado */}
+          {shouldShowDemo && (
+            <>
+              {/* Divisor */}
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-slate-800 w-full" />
+                <span className="bg-slate-900 px-3 text-[11px] font-medium text-amber-400 uppercase tracking-wider absolute flex items-center gap-1">
+                  <TestTube className="w-3 h-3" />
+                  Acesso Rápido LAB (Testes)
+                </span>
+              </div>
 
-          {/* Botões de Acesso Rápido aos 3 Perfis */}
-          <div className="grid grid-cols-1 gap-2.5 pt-1">
-            {superAdminUser && (
-              <button
-                type="button"
-                onClick={() => handleQuickLogin(superAdminUser)}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 hover:bg-slate-800/60 border border-slate-800 hover:border-indigo-500/50 transition-all group text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-slate-200">👑 Super Admin</div>
-                    <div className="text-[11px] text-slate-400">Mario Henrique • Acesso Total</div>
-                  </div>
-                </div>
-                <span className="text-[11px] font-medium text-indigo-400 group-hover:translate-x-0.5 transition-transform">Entrar →</span>
-              </button>
-            )}
+              {/* Botões de Acesso Rápido aos 3 Perfis */}
+              <div className="grid grid-cols-1 gap-2.5 pt-1">
+                {superAdminUser && (
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin(superAdminUser)}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 hover:bg-slate-800/60 border border-slate-800 hover:border-indigo-500/50 transition-all group text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-slate-200">👑 Super Admin</div>
+                        <div className="text-[11px] text-slate-400">{superAdminUser.name} • Acesso Total</div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-medium text-indigo-400 group-hover:translate-x-0.5 transition-transform">Entrar →</span>
+                  </button>
+                )}
 
-            {coordUser && (
-              <button
-                type="button"
-                onClick={() => handleQuickLogin(coordUser)}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 hover:bg-slate-800/60 border border-slate-800 hover:border-amber-500/50 transition-all group text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-slate-200">📍 Coordenador por Zona</div>
-                    <div className="text-[11px] text-slate-400">{coordUser.name} • {coordUser.regionName || 'Manaus'}</div>
-                  </div>
-                </div>
-                <span className="text-[11px] font-medium text-amber-400 group-hover:translate-x-0.5 transition-transform">Entrar →</span>
-              </button>
-            )}
+                {gestorUser && (
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin(gestorUser)}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 hover:bg-slate-800/60 border border-slate-800 hover:border-cyan-500/50 transition-all group text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover:bg-cyan-500 group-hover:text-white transition-all">
+                        <Key className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-slate-200">🔑 Gestor de Acessos</div>
+                        <div className="text-[11px] text-slate-400">{gestorUser.name} • Cadastro & Controle</div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-medium text-cyan-400 group-hover:translate-x-0.5 transition-transform">Entrar →</span>
+                  </button>
+                )}
 
-            {campoUser && (
-              <button
-                type="button"
-                onClick={() => handleQuickLogin(campoUser)}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 hover:bg-slate-800/60 border border-slate-800 hover:border-emerald-500/50 transition-all group text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                    <UserCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-slate-200">📱 Responsável de Campo</div>
-                    <div className="text-[11px] text-slate-400">{campoUser.name} • {campoUser.regionName || 'Manaus'}</div>
-                  </div>
-                </div>
-                <span className="text-[11px] font-medium text-emerald-400 group-hover:translate-x-0.5 transition-transform">Entrar →</span>
-              </button>
-            )}
-          </div>
+                {coordUser && (
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin(coordUser)}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 hover:bg-slate-800/60 border border-slate-800 hover:border-amber-500/50 transition-all group text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                        <MapPin className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-slate-200">📍 Coordenador por Zona</div>
+                        <div className="text-[11px] text-slate-400">{coordUser.name} • {coordUser.regionName || 'Zona Central'}</div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-medium text-amber-400 group-hover:translate-x-0.5 transition-transform">Entrar →</span>
+                  </button>
+                )}
+
+                {campoUser && (
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin(campoUser)}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 hover:bg-slate-800/60 border border-slate-800 hover:border-emerald-500/50 transition-all group text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                        <UserCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-slate-200">📱 Responsável de Campo</div>
+                        <div className="text-[11px] text-slate-400">{campoUser.name} • {campoUser.regionName || 'Manaus'}</div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-medium text-emerald-400 group-hover:translate-x-0.5 transition-transform">Entrar →</span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Rodapé institucional */}
@@ -208,6 +262,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess 
           Vértice Plataforma Operacional &copy; 2026 • Todos os direitos reservados.
         </div>
       </div>
+
+      {/* Disclaimer Modal de Termos LGPD e Uso Profissional */}
+      {pendingDisclaimerUser && (
+        <FieldDisclaimerModal
+          onAccept={() => {
+            const u = pendingDisclaimerUser;
+            setPendingDisclaimerUser(null);
+            onLoginSuccess(u);
+          }}
+          onCancel={() => {
+            setPendingDisclaimerUser(null);
+          }}
+        />
+      )}
     </div>
   );
 };
+

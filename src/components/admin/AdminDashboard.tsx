@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { OperationalMetrics, CheckIn, Team, ActionPoint, Region } from '../../types';
+import { OperationalMetrics, CheckIn, Team, ActionPoint, Region, CheckInStatus } from '../../types';
 import { Users, CheckCircle2, AlertTriangle, MapPin, Filter, Sparkles, ChevronRight } from 'lucide-react';
 import { KpiDetailModal, KpiModalType } from './KpiDetailModal';
 
@@ -13,7 +13,10 @@ interface AdminDashboardProps {
   onRegionChange: (regionId: string) => void;
   selectedStatus: string;
   onStatusChange: (status: string) => void;
+  selectedDate: string;
+  onDateChange: (date: string) => void;
   onNavigateToAudit?: () => void;
+  onAuditDecision?: (checkInId: string, newStatus: CheckInStatus, reason: string) => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -26,7 +29,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onRegionChange,
   selectedStatus,
   onStatusChange,
-  onNavigateToAudit
+  selectedDate,
+  onDateChange,
+  onNavigateToAudit,
+  onAuditDecision
 }) => {
   const [modalType, setModalType] = useState<KpiModalType>(null);
 
@@ -173,6 +179,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         checkIns={checkIns}
         onClose={() => setModalType(null)}
         onNavigateToAudit={onNavigateToAudit}
+        onAuditDecision={onAuditDecision}
       />
 
       {/* Barra de Filtros Operacionais */}
@@ -183,6 +190,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-xs">
+          <div>
+            <label className="text-slate-400 mr-2">Data:</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => onDateChange(e.target.value)}
+              className="bg-slate-950 border border-slate-700 text-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
+            />
+          </div>
           <div>
             <label className="text-slate-400 mr-2">Região / Zona:</label>
             <select

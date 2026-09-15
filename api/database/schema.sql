@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS `pontos_atuacao` (
   `latitude` DECIMAL(10, 8) NOT NULL,
   `longitude` DECIMAL(11, 8) NOT NULL,
   `raio_tolerancia_metros` INT NOT NULL DEFAULT 50,
+  `data_agendada` DATE NULL,
+  `horario_inicio` TIME NULL,
+  `horario_fim` TIME NULL,
+  `equipe_atribuida_id` VARCHAR(36) NULL,
   `status` ENUM('ativo', 'inativo') DEFAULT 'ativo',
   FOREIGN KEY (`campanha_id`) REFERENCES `campanhas`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`regiao_id`) REFERENCES `regioes`(`id`) ON DELETE CASCADE

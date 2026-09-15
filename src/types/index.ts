@@ -1,9 +1,10 @@
-export type UserRole = 'admin' | 'coordenador' | 'campo';
+export type UserRole = 'admin' | 'gestor_acesso' | 'coordenador' | 'campo';
 
 export interface User {
   id: string;
   name: string;
-  email: string;
+  username?: string;
+  email?: string;
   password?: string;
   role: UserRole;
   phone?: string;
@@ -14,6 +15,7 @@ export interface User {
   teamId?: string; // Para responsáveis de campo
   teamName?: string;
   assignedActionPointIds?: string[];
+  mustChangePassword?: boolean;
 }
 
 export interface Campaign {
@@ -45,6 +47,11 @@ export interface ActionPoint {
   latitude: number;
   longitude: number;
   radiusMeters: number; // Raio permitido para check-in (ex: 50m, 100m)
+  scheduledDate?: string; // YYYY-MM-DD
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
+  assignedTeamId?: string;
+  assignedTeamName?: string;
   status: 'ativo' | 'inativo';
 }
 

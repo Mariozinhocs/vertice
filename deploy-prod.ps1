@@ -1,4 +1,4 @@
-# Script de Deploy Automatizado Hostinger Staging (/hml) - Vértice
+# Script de Deploy Automatizado Hostinger Staging (/) - Vértice
 # Squad A-Team | Vértice AI
 
 $env:Path = "C:\Program Files\nodejs;" + $env:Path
@@ -6,8 +6,8 @@ $env:Path = "C:\Program Files\nodejs;" + $env:Path
 $FtpServer   = "ftp.vertice.hubdigital360.com"
 $FtpUser     = "u576215103.vertica"
 $FtpPass     = "*9t5*OvjXF"
-$FtpRemoteDir= "/hml"
-$StagingUrl  = "https://vertice.hubdigital360.com/hml"
+$FtpRemoteDir= "/"
+$StagingUrl  = "https://vertice.hubdigital360.com/"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host " 🚀 DEPLOY DE HOMOLOGAÇÃO: $StagingUrl " -ForegroundColor Cyan
@@ -27,6 +27,8 @@ $npxCmd = "C:\Program Files\nodejs\npx.cmd"
 Push-Location $tempBuild
 try {
     if (Test-Path $npmCmd) { & $npmCmd install --no-audit --no-fund } else { npm install --no-audit --no-fund }
+    $env:VITE_APP_ENV = "production"
+    $env:VITE_SHOW_DEMO = "false"
     if (Test-Path $npxCmd) { & $npxCmd vite build } else { npx vite build }
 } finally {
     Pop-Location
@@ -57,10 +59,10 @@ Write-Host "`n[3/3] Copiando API REST em PHP 8 com credenciais da Hostinger..." 
 Copy-Item -Recurse -Force "api/*" "$deployDir/api/"
 
 Write-Host "`n==========================================================" -ForegroundColor Green
-Write-Host " 🎉 PACOTE PREPARADO PARA AMBIENTE /hml" -ForegroundColor Green
+Write-Host " 🎉 PACOTE PREPARADO PARA AMBIENTE /" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
 
-# 4. Upload Automático por FTP para Hostinger no diretório /hml
+# 4. Upload Automático por FTP para Hostinger no diretório /
 Write-Host "`n[FTP Upload] Iniciando transferência para $FtpServer ($FtpRemoteDir)..." -ForegroundColor Yellow
 
 function Ensure-FtpDirectory($remoteUrl, $username, $password) {

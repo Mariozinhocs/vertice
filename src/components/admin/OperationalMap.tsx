@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import { Team, ActionPoint, CheckIn, CheckInStatus } from '../../types';
-import { MapPin, CheckCircle2, AlertTriangle, XCircle, Clock, Users, Camera, X, Shield, Navigation, Phone } from 'lucide-react';
+import { getImageUrl } from '../../services/imageService';
+import { MapPin, CheckCircle2, AlertTriangle, XCircle, Clock, Users, Camera, X, Shield, Navigation, Phone, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface OperationalMapProps {
@@ -10,6 +11,8 @@ interface OperationalMapProps {
   actionPoints: ActionPoint[];
   checkIns: CheckIn[];
   onAuditCheckIn?: (checkInId: string, newStatus: CheckInStatus, reason: string) => void;
+  onDeleteCheckIn?: (checkInId: string) => void;
+  currentUserRole?: string;
 }
 
 // Criação de Ícones customizados do Leaflet em SVG para cada status
@@ -57,7 +60,9 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
   teams,
   actionPoints,
   checkIns,
-  onAuditCheckIn
+  onAuditCheckIn,
+  onDeleteCheckIn,
+  currentUserRole
 }) => {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<ActionPoint | null>(null);
@@ -99,7 +104,7 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
           {/* Círculos de Raio dos Pontos de Atuação */}
@@ -127,7 +132,13 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
                   }}
                 >
                   <Popup className="custom-popup">
-                    <div className="p-1.5 text-slate-900 text-xs space-y-1">
+                    <div 
+                      className="p-1.5 text-slate-900 text-xs space-y-1 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectPointMarker(point);
+                      }}
+                    >
                       <strong className="block font-bold text-sm">{point.name}</strong>
                       <p className="text-slate-600 text-[11px]">{point.address}</p>
                       <div className="flex items-center gap-1 text-[10px] text-indigo-700 font-bold">
@@ -163,7 +174,13 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
                 }}
               >
                 <Popup>
-                  <div className="p-1 text-slate-900 text-xs">
+                  <div 
+                    className="p-1 text-slate-900 text-xs cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectTeamMarker(team, checkIn || null);
+                    }}
+                  >
                     <strong className="block font-bold text-sm">{team.name}</strong>
                     <p>Coordenador: {team.coordinatorName}</p>
                     <p className="font-semibold mt-1">
@@ -211,6 +228,19 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
                   <p className="text-[11px] text-slate-400">{selectedPoint.address}</p>
                 </div>
               </div>
+              
+              {selectedPoint.scheduledDate && (
+                <div className="bg-indigo-950/40 border border-indigo-500/20 p-2 rounded-lg text-[11px] text-indigo-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1 font-semibold">
+                    <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Agenda: {selectedPoint.scheduledDate}</span>
+                  </span>
+                  <span className="font-mono bg-indigo-500/20 px-1.5 py-0.5 rounded border border-indigo-500/30 font-bold">
+                    {selectedPoint.startTime || '08:00'} - {selectedPoint.endTime || '18:00'}
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
                 <span>GPS: {selectedPoint.latitude.toFixed(4)}, {selectedPoint.longitude.toFixed(4)}</span>
                 <span className="text-indigo-400 font-bold">Raio: {selectedPoint.radiusMeters}m</span>
@@ -244,99 +274,160 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
             </div>
           )}
 
-          {/* Status do Check-in e Evidência */}
-          {selectedCheckIn ? (
-            <div className="space-y-4">
-              <div
-                className={`p-4 rounded-xl border space-y-2 text-xs ${
-                  selectedCheckIn.status === 'validado'
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : selectedCheckIn.status === 'pendente_analise'
-                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-                }`}
-              >
-                <div className="flex items-center justify-between font-bold text-sm">
-                  <span className="uppercase">STATUS: {selectedCheckIn.status.replace('_', ' ')}</span>
-                  {selectedCheckIn.status === 'validado' && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
-                  {selectedCheckIn.status === 'pendente_analise' && <AlertTriangle className="w-5 h-5 text-amber-400" />}
-                  {selectedCheckIn.status === 'rejeitado' && <XCircle className="w-5 h-5 text-rose-400" />}
-                </div>
-                <p>{selectedCheckIn.statusReason}</p>
-              </div>
+          {/* Status dos Check-ins e Evidências Individuais */}
+          {(() => {
+            const pointCheckIns = checkIns.filter(
+              (c) => c.actionPointId === selectedPoint?.id || c.teamId === selectedTeam?.id
+            );
 
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs text-slate-300">
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Horário Check-in:</span>
-                  <span className="font-bold text-white">{format(new Date(selectedCheckIn.timestamp), 'HH:mm:ss')}</span>
+            if (pointCheckIns.length === 0) {
+              return (
+                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 text-center text-xs text-slate-400 space-y-2">
+                  <Clock className="w-6 h-6 text-slate-600 mx-auto" />
+                  <p>Ainda não há check-in registrado neste ponto de ação hoje.</p>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Distância Calculada:</span>
-                  <span className="font-bold text-indigo-400">{selectedCheckIn.distanceCalculatedMeters} metros</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-400">Precisão GPS:</span>
-                  <span className="font-bold text-slate-200">±{selectedCheckIn.gpsAccuracyMeters} m</span>
-                </div>
-              </div>
+              );
+            }
 
-              {/* Evidência Fotográfica com Marca d'água */}
-              {selectedCheckIn.imageWatermarkUrl && (
-                <div className="space-y-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                    Evidência Fotográfica Georreferenciada
-                  </span>
-                  <div
-                    onClick={() => setShowPhotoModal(true)}
-                    className="relative rounded-xl overflow-hidden border border-slate-700 cursor-pointer group shadow-lg"
-                  >
-                    <img
-                      src={selectedCheckIn.imageWatermarkUrl}
-                      alt="Evidência Fotográfica"
-                      className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-200"
-                    />
-                    <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold space-x-1.5 backdrop-blur-[2px]">
-                      <Camera className="w-4 h-4" />
-                      <span>Clique para Ampliar Foto</span>
+            const currentChk = selectedCheckIn || pointCheckIns[0];
+
+            return (
+              <div className="space-y-4">
+                {/* Se houver múltiplas evidências no mesmo ponto */}
+                {pointCheckIns.length > 1 && (
+                  <div className="bg-indigo-950/50 border border-indigo-500/30 p-2.5 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-indigo-300">
+                      <span>📸 Evidências Registradas ({pointCheckIns.length})</span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {pointCheckIns.findIndex((c) => c.id === currentChk.id) + 1} / {pointCheckIns.length}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                      {pointCheckIns.map((chk, idx) => (
+                        <button
+                          key={chk.id}
+                          onClick={() => setSelectedCheckIn(chk)}
+                          className={`text-[10px] px-2.5 py-1.5 rounded-lg border font-semibold flex items-center gap-1 shrink-0 ${
+                            chk.id === currentChk.id
+                              ? 'bg-indigo-600 text-white border-indigo-400 shadow'
+                              : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
+                          }`}
+                        >
+                          <span>Evidência #{idx + 1}</span>
+                          <span className="text-[9px] opacity-75">({format(new Date(chk.timestamp), 'HH:mm')})</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Ação de Auditoria Rápida */}
-              {onAuditCheckIn && selectedCheckIn.status === 'pendente_analise' && (
-                <div className="pt-2 border-t border-slate-800 space-y-2">
-                  <span className="text-xs font-bold text-amber-400 block">Ação de Auditoria:</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => onAuditCheckIn(selectedCheckIn.id, 'validado', 'Aprovado manualmente pelo auditor.')}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 rounded-lg transition-all shadow"
-                    >
-                      Aprovar
-                    </button>
-                    <button
-                      onClick={() => onAuditCheckIn(selectedCheckIn.id, 'rejeitado', 'Rejeitado por divergência pelo auditor.')}
-                      className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2 rounded-lg transition-all shadow"
-                    >
-                      Rejeitar
-                    </button>
+                <div
+                  className={`p-4 rounded-xl border space-y-2 text-xs ${
+                    currentChk.status === 'validado'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                      : currentChk.status === 'pendente_analise'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                      : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-bold text-sm">
+                    <span className="uppercase">STATUS: {currentChk.status.replace('_', ' ')}</span>
+                    {currentChk.status === 'validado' && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
+                    {currentChk.status === 'pendente_analise' && <AlertTriangle className="w-5 h-5 text-amber-400" />}
+                    {currentChk.status === 'rejeitado' && <XCircle className="w-5 h-5 text-rose-400" />}
+                  </div>
+                  <p>{currentChk.statusReason}</p>
+                </div>
+
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs text-slate-300">
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Enviado por:</span>
+                    <span className="font-bold text-white">{currentChk.coordinatorName} ({currentChk.teamName})</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Horário Check-in:</span>
+                    <span className="font-bold text-white">{format(new Date(currentChk.timestamp), 'HH:mm:ss')}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800">
+                    <span className="text-slate-400">Distância Calculada:</span>
+                    <span className="font-bold text-indigo-400">{currentChk.distanceCalculatedMeters} metros</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-slate-400">Precisão GPS:</span>
+                    <span className="font-bold text-slate-200">±{currentChk.gpsAccuracyMeters} m</span>
                   </div>
                 </div>
-              )}
 
-            </div>
-          ) : (
-            <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 text-center text-xs text-slate-400 space-y-2">
-              <Clock className="w-6 h-6 text-slate-600 mx-auto" />
-              <p>Ainda não há check-in registrado neste ponto de ação hoje.</p>
-            </div>
-          )}
+                {/* Evidência Fotográfica com Marca d'água */}
+                {(currentChk.imageWatermarkUrl || currentChk.imageUrl) && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                      Evidência Fotográfica Georreferenciada
+                    </span>
+                    <div
+                      onClick={() => {
+                        setSelectedCheckIn(currentChk);
+                        setShowPhotoModal(true);
+                      }}
+                      className="relative rounded-xl overflow-hidden border border-slate-700 cursor-pointer group shadow-lg"
+                    >
+                      <img
+                        src={getImageUrl(currentChk.imageWatermarkUrl || currentChk.imageUrl)}
+                        alt="Evidência Fotográfica"
+                        className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                      <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold space-x-1.5 backdrop-blur-[2px]">
+                        <Camera className="w-4 h-4" />
+                        <span>Clique para Ampliar Foto</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Ação de Auditoria Rápida */}
+                {onAuditCheckIn && currentChk.status === 'pendente_analise' && (
+                  <div className="pt-2 border-t border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-amber-400 block">Ação de Auditoria:</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => onAuditCheckIn(currentChk.id, 'validado', 'Aprovado manualmente pelo auditor.')}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 rounded-lg transition-all shadow"
+                      >
+                        Aprovar
+                      </button>
+                      <button
+                        onClick={() => onAuditCheckIn(currentChk.id, 'rejeitado', 'Rejeitado por divergência pelo auditor.')}
+                        className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2 rounded-lg transition-all shadow"
+                      >
+                        Rejeitar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Ação de Exclusão Física (Apenas Admin) */}
+                {currentUserRole === 'admin' && onDeleteCheckIn && (
+                  <div className="pt-2">
+                    <button
+                      onClick={() => onDeleteCheckIn(currentChk.id)}
+                      className="w-full flex items-center justify-center gap-1.5 bg-rose-950/40 hover:bg-rose-900 border border-rose-900/50 hover:border-rose-500/50 text-rose-400 hover:text-white font-semibold text-[11px] py-1.5 rounded-lg transition-all shadow"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Excluir Evidência Permanentemente
+                    </button>
+                  </div>
+                )}
+
+              </div>
+            );
+          })()}
 
         </div>
       )}
 
       {/* Modal de Foto Ampliada */}
-      {showPhotoModal && selectedCheckIn?.imageWatermarkUrl && (
+      {showPhotoModal && selectedCheckIn && (selectedCheckIn.imageWatermarkUrl || selectedCheckIn.imageUrl) && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="relative max-w-4xl w-full bg-slate-900 rounded-2xl border border-slate-800 p-2 shadow-2xl">
             <button
@@ -346,7 +437,7 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
               <X className="w-6 h-6" />
             </button>
             <img
-              src={selectedCheckIn.imageWatermarkUrl}
+              src={getImageUrl(selectedCheckIn.imageWatermarkUrl || selectedCheckIn.imageUrl)}
               alt="Evidência em alta resolução"
               className="w-full max-h-[80vh] object-contain rounded-xl"
             />

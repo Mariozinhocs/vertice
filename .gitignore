@@ -4,9 +4,9 @@ node_modules/
 .pnp.js
 
 # Build Output
-dist/
+dist*/
 build/
-deploy_package/
+deploy_package*/
 
 # Environment and Local Configs
 .env

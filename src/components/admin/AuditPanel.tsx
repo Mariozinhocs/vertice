@@ -1,18 +1,23 @@
 import React, { useState } from 'react';
 import { CheckIn, CheckInStatus, AuditLog } from '../../types';
-import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Eye, Camera, Clock, MapPin, Search } from 'lucide-react';
+import { getImageUrl } from '../../services/imageService';
+import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Eye, Camera, Clock, MapPin, Search, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface AuditPanelProps {
   checkIns: CheckIn[];
   auditLogs: AuditLog[];
   onAuditDecision: (checkInId: string, newStatus: CheckInStatus, reason: string) => void;
+  onDeleteCheckIn?: (checkInId: string) => void;
+  currentUserRole?: string;
 }
 
 export const AuditPanel: React.FC<AuditPanelProps> = ({
   checkIns,
   auditLogs,
-  onAuditDecision
+  onAuditDecision,
+  onDeleteCheckIn,
+  currentUserRole
 }) => {
   const [activeTab, setActiveTab] = useState<'pending' | 'logs'>('pending');
   const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
@@ -157,14 +162,14 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
                 </div>
 
                 {/* Foto Evidência com Marca d'água */}
-                {selectedCheckIn.imageWatermarkUrl ? (
+                {(selectedCheckIn.imageWatermarkUrl || selectedCheckIn.imageUrl) ? (
                   <div className="space-y-2">
                     <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                      Evidência Fotográfica com Marca d'água
+                      Evidência Fotográfica Georreferenciada
                     </span>
                     <div className="relative rounded-2xl overflow-hidden border border-slate-700 bg-slate-950">
                       <img
-                        src={selectedCheckIn.imageWatermarkUrl}
+                        src={getImageUrl(selectedCheckIn.imageWatermarkUrl || selectedCheckIn.imageUrl)}
                         alt="Foto com Marca d'água"
                         className="w-full h-80 object-contain"
                       />
@@ -217,6 +222,22 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
                       <span>Rejeitar Registro</span>
                     </button>
                   </div>
+                  
+                  {/* Botão de Exclusão Física (Apenas Admin) */}
+                  {currentUserRole === 'admin' && onDeleteCheckIn && (
+                    <div className="pt-2">
+                      <button
+                        onClick={() => {
+                          onDeleteCheckIn(selectedCheckIn.id);
+                          setSelectedCheckIn(null);
+                        }}
+                        className="w-full flex items-center justify-center space-x-2 bg-rose-950/40 hover:bg-rose-900 border border-rose-900/50 hover:border-rose-500/50 text-rose-400 hover:text-white font-semibold py-2 rounded-xl text-xs transition-all shadow"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Excluir Evidência Permanentemente</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
               </div>

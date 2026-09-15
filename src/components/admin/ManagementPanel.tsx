@@ -1,35 +1,70 @@
 import React, { useState } from 'react';
-import { ActionPoint, Team, Region, User } from '../../types';
-import { Plus, MapPin, Users, Edit3, Trash2, Shield, Phone, CheckCircle2, ChevronRight } from 'lucide-react';
+import { ActionPoint, Team, Region, User, Campaign } from '../../types';
+import { Plus, MapPin, Users, Edit3, Trash2, Shield, Phone, CheckCircle2, ChevronRight, UserCheck, Map, Flag, Calendar } from 'lucide-react';
 import { ActionPointModal } from './ActionPointModal';
 import { TeamModal } from './TeamModal';
+import { RegionModal } from './RegionModal';
+import { UserModal } from './UserModal';
+import { CampaignModal } from './CampaignModal';
 
 interface ManagementPanelProps {
+  campaign?: Campaign;
   actionPoints: ActionPoint[];
   teams: Team[];
   regions: Region[];
   users: User[];
+  currentUser?: User | null;
   onAddActionPoint: (point: ActionPoint) => void;
   onUpdateActionPoint?: (point: ActionPoint) => void;
   onDeleteActionPoint?: (pointId: string) => void;
   onAddTeam: (team: Team) => void;
   onUpdateTeam?: (team: Team) => void;
   onDeleteTeam?: (teamId: string) => void;
+  onAddRegion?: (region: Region) => void;
+  onUpdateRegion?: (region: Region) => void;
+  onDeleteRegion?: (regionId: string) => void;
+  onAddUser?: (user: User) => void;
+  onUpdateUser?: (user: User) => void;
+  onDeleteUser?: (userId: string) => void;
+  onUpdateCampaign?: (campaign: Campaign) => void;
 }
 
 export const ManagementPanel: React.FC<ManagementPanelProps> = ({
+  campaign,
   actionPoints,
   teams,
-  regions,
-  users,
+  regions: initialRegions,
+  users: initialUsers,
+  currentUser,
   onAddActionPoint,
   onUpdateActionPoint,
   onDeleteActionPoint,
   onAddTeam,
   onUpdateTeam,
-  onDeleteTeam
+  onDeleteTeam,
+  onAddRegion,
+  onUpdateRegion,
+  onDeleteRegion,
+  onAddUser,
+  onUpdateUser,
+  onDeleteUser,
+  onUpdateCampaign
 }) => {
-  const [activeTab, setActiveTab] = useState<'points' | 'teams'>('points');
+  const [activeTab, setActiveTab] = useState<'points' | 'teams' | 'users' | 'regions' | 'campaign'>('points');
+  const [showCampaignModal, setShowCampaignModal] = useState<boolean>(false);
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Estados Locais para Bases e Usuários (sincronizados com as props globais)
+  const [regions, setRegions] = useState<Region[]>(initialRegions);
+  const [users, setUsers] = useState<User[]>(initialUsers);
+
+  React.useEffect(() => {
+    setRegions(initialRegions);
+  }, [initialRegions]);
+
+  React.useEffect(() => {
+    setUsers(initialUsers);
+  }, [initialUsers]);
 
   // Modais de Ponto de Atuação
   const [showPointModal, setShowPointModal] = useState<boolean>(false);
@@ -38,6 +73,14 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
   // Modais de Equipe
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+
+  // Modais de Base / Zona
+  const [showRegionModal, setShowRegionModal] = useState<boolean>(false);
+  const [editingRegion, setEditingRegion] = useState<Region | null>(null);
+
+  // Modais de Coordenador / Usuário
+  const [showUserModal, setShowUserModal] = useState<boolean>(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
 
   const handleOpenNewPoint = () => {
     setEditingPoint(null);
@@ -75,6 +118,64 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
     }
   };
 
+  // Handlers para Bases / Zonas
+  const handleOpenNewRegion = () => {
+    setEditingRegion(null);
+    setShowRegionModal(true);
+  };
+
+  const handleOpenEditRegion = (region: Region) => {
+    setEditingRegion(region);
+    setShowRegionModal(true);
+  };
+
+  const handleSaveRegion = (region: Region) => {
+    if (editingRegion) {
+      setRegions((prev) => prev.map((r) => (r.id === region.id ? region : r)));
+      if (onUpdateRegion) onUpdateRegion(region);
+    } else {
+      setRegions((prev) => [region, ...prev]);
+      if (onAddRegion) onAddRegion(region);
+    }
+  };
+
+  const handleDeleteRegion = (regionId: string) => {
+    setRegions((prev) => prev.filter((r) => r.id !== regionId));
+    if (onDeleteRegion) onDeleteRegion(regionId);
+  };
+
+  // Handlers para Coordenadores / Usuários
+  const handleOpenNewUser = () => {
+    setEditingUser(null);
+    setShowUserModal(true);
+  };
+
+  const handleOpenEditUser = (user: User) => {
+    setEditingUser(user);
+    setShowUserModal(true);
+  };
+
+  const handleSaveUser = (user: User) => {
+    if (editingUser) {
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? user : u)));
+      if (onUpdateUser) onUpdateUser(user);
+    } else {
+      setUsers((prev) => [user, ...prev]);
+      if (onAddUser) onAddUser(user);
+    }
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    if (onDeleteUser) onDeleteUser(userId);
+  };
+
+  const [userSubTab, setUserSubTab] = useState<'coordenadores' | 'usuarios'>('coordenadores');
+
+  const safeUsers = Array.isArray(users) ? users : [];
+  const coordinators = safeUsers.filter((u) => u && u.role === 'coordenador');
+  const otherUsers = safeUsers.filter((u) => u && u.role !== 'coordenador');
+
   return (
     <div className="space-y-6 font-['Inter',sans-serif]">
       
@@ -85,56 +186,120 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
             <Users className="w-6 h-6 text-purple-400" />
           </div>
           <div>
-            <h2 className="text-lg font-extrabold text-white">Cadastros Operacionais & Equipes</h2>
+            <h2 className="text-lg font-extrabold text-white">Cadastros Operacionais, Bases & Equipes</h2>
             <p className="text-xs text-slate-400">
-              Gerenciamento de Pontos de Atuação, Zonas Geográficas e Escalas das Equipes
+              Gerenciamento de Pontos de Atuação, Zonas Geográficas, Coordenadores e Equipes
             </p>
           </div>
         </div>
 
         {/* Seletor de Abas */}
-        <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+        <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold overflow-x-auto">
           <button
             onClick={() => setActiveTab('points')}
-            className={`px-4 py-2 rounded-lg transition-all ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
               activeTab === 'points'
-                ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
+                ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Pontos de Atuação ({actionPoints.length})
+            <MapPin className="w-3.5 h-3.5" />
+            <span>Pontos ({actionPoints.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('teams')}
-            className={`px-4 py-2 rounded-lg transition-all ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
               activeTab === 'teams'
                 ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Equipes ({teams.length})
+            <Users className="w-3.5 h-3.5" />
+            <span>Equipes ({teams.length})</span>
           </button>
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+              activeTab === 'users'
+                ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>Usuários ({safeUsers.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('regions')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+              activeTab === 'regions'
+                ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Map className="w-3.5 h-3.5" />
+            <span>Bases / Zonas ({regions.length})</span>
+          </button>
+          {campaign && (
+            <button
+              onClick={() => setActiveTab('campaign')}
+              className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                activeTab === 'campaign'
+                  ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Flag className="w-3.5 h-3.5" />
+              <span>Dados da Campanha</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* ABA 1: PONTOS DE ATUAÇÃO */}
       {activeTab === 'points' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Pontos de Ação Cadastrados ({actionPoints.length})
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-slate-300">
+                <Calendar className="w-4 h-4 text-indigo-400" />
+                <span className="text-xs font-semibold">Data de Referência:</span>
+              </div>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-white text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 px-2 py-1.5"
+              />
+              {selectedDate && (
+                <button
+                  onClick={() => setSelectedDate('')}
+                  className="text-[10px] text-slate-400 hover:text-white underline"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+
             <button
               onClick={handleOpenNewPoint}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg shadow-indigo-600/30 flex items-center space-x-1.5 transition-all"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 flex items-center space-x-1.5 transition-all self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" />
               <span>Novo Ponto de Atuação</span>
             </button>
           </div>
 
+          <div className="flex justify-between items-center px-1">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Pontos de Ação Cadastrados 
+              {selectedDate && ` em ${selectedDate.split('-').reverse().join('/')}`}
+            </h3>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {actionPoints.map((point) => {
+            {actionPoints
+              .filter((point) => !selectedDate || point.scheduledDate === selectedDate)
+              .map((point) => {
               const region = regions.find((r) => r.id === point.regionId);
               return (
                 <div
@@ -158,11 +323,35 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
 
                   <p className="text-xs text-slate-400 line-clamp-2">{point.address}</p>
 
+                  {point.scheduledDate && (
+                    <div className="bg-slate-950 p-2 rounded-lg text-[10px] text-indigo-300 border border-slate-800 flex justify-between font-mono">
+                      <span>📅 {point.scheduledDate}</span>
+                      <span>⏰ {point.startTime || '08:00'} - {point.endTime || '18:00'}</span>
+                    </div>
+                  )}
+
                   <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                    <span>LAT: {point.latitude.toFixed(5)}</span>
-                    <span className="text-indigo-400 font-sans font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                      Editar <ChevronRight className="w-3 h-3 inline" />
-                    </span>
+                    <span>LAT: {point.latitude.toFixed(4)}</span>
+                    <div className="flex items-center gap-2 font-sans font-semibold">
+                      {onDeleteActionPoint && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Deseja realmente excluir o ponto "${point.name}"?`)) {
+                              onDeleteActionPoint(point.id);
+                            }
+                          }}
+                          className="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all text-xs flex items-center gap-1"
+                          title="Excluir ponto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <span className="text-indigo-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                        Editar <ChevronRight className="w-3 h-3 inline" />
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -195,7 +384,8 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
               return (
                 <div
                   key={team.id}
-                  className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 space-y-4 shadow-md hover:border-purple-500/40 transition-all"
+                  onClick={() => handleOpenEditTeam(team)}
+                  className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 space-y-4 shadow-md hover:border-purple-500/40 transition-all cursor-pointer group"
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -213,19 +403,21 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => handleOpenEditTeam(team)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 border border-slate-700 transition-all text-xs"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 border border-slate-700 transition-all text-xs flex items-center gap-1"
                         title="Editar equipe e membros"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
+                        <span>Editar</span>
                       </button>
                       {onDeleteTeam && (
                         <button
-                          onClick={() => {
-                            if (confirm(`Deseja excluir a equipe "${team.name}"?`)) {
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Deseja realmente excluir a equipe "${team.name}"?`)) {
                               onDeleteTeam(team.id);
                             }
                           }}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border border-slate-700 transition-all text-xs"
+                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all text-xs flex items-center gap-1"
                           title="Excluir equipe"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -262,31 +454,268 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Pontos Atribuídos */}
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                      Pontos de Atuação Vinculados ({assignedPoints.length})
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {assignedPoints.length === 0 ? (
-                        <span className="text-[11px] text-slate-500 italic">Nenhum ponto vinculado</span>
-                      ) : (
-                        assignedPoints.map((pt) => (
-                          <span
-                            key={pt.id}
-                            className="bg-slate-950 px-2.5 py-1 rounded-md border border-slate-800 text-[11px] text-slate-300 flex items-center gap-1"
-                          >
-                            <MapPin className="w-3 h-3 text-indigo-400 shrink-0" />
-                            <span className="truncate max-w-[180px]">{pt.name}</span>
+                  {/* Pontos de Atuação */}
+                  {assignedPoints.length > 0 && (
+                    <div className="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Pontos Atribuídos ({assignedPoints.length})</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {assignedPoints.map((p) => (
+                          <span key={p.id} className="text-[10px] px-2 py-1 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                            {p.name}
                           </span>
-                        ))
-                      )}
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ABA 3: COORDENADORES & USUÁRIOS */}
+      {activeTab === 'users' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+            {/* Sub-Abas: Coordenadores vs Usuários */}
+            <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+              <button
+                onClick={() => setUserSubTab('coordenadores')}
+                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                  userSubTab === 'coordenadores'
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>Coordenadores ({coordinators.length})</span>
+              </button>
+              <button
+                onClick={() => setUserSubTab('usuarios')}
+                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                  userSubTab === 'usuarios'
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Demais Usuários ({otherUsers.length})</span>
+              </button>
+            </div>
+
+            <button
+              onClick={handleOpenNewUser}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-600/30 flex items-center space-x-1.5 transition-all self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Novo Usuário</span>
+            </button>
+          </div>
+
+          <div className="flex justify-between items-center px-1">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              {userSubTab === 'coordenadores'
+                ? `Coordenadores Responsáveis por Zona (${coordinators.length})`
+                : `Demais Usuários & Perfis do Sistema (${otherUsers.length})`}
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(userSubTab === 'coordenadores' ? coordinators : otherUsers).map((u) => (
+              <div
+                key={u.id}
+                onClick={() => handleOpenEditUser(u)}
+                className="bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/40 p-4 rounded-xl space-y-3 shadow-md transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xs">
+                      {(u.name || 'US').substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-white group-hover:text-emerald-300 transition-colors">
+                        {u.name || 'Usuário Sem Nome'}
+                      </h4>
+                      <span className="text-[10px] text-slate-400 block">{u.email || u.phone || 'Sem e-mail'}</span>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${
+                    u.role === 'admin'
+                      ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                      : u.role === 'coordenador'
+                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                      : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                  }`}>
+                    {u.role === 'admin' ? 'Super Admin' : u.role === 'coordenador' ? 'Coordenador' : 'Resp. Campo'}
+                  </span>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>
+                    {u.role === 'coordenador'
+                      ? `Zona: ${u.regionName || 'Geral'}`
+                      : u.role === 'campo'
+                      ? `Equipe: ${u.teamName || 'Geral'}`
+                      : `Perfil: ${u.regionName || 'Geral'}`}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Deseja realmente excluir o usuário "${u.name}"?`)) {
+                          handleDeleteUser(u.id);
+                        }
+                      }}
+                      className="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all text-xs flex items-center gap-1"
+                      title="Excluir usuário"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-emerald-400 font-semibold">Editar →</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {(userSubTab === 'coordenadores' ? coordinators : otherUsers).length === 0 && (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-500">
+              Nenhum registro encontrado nesta sub-aba.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ABA 4: BASES / ZONAS */}
+      {activeTab === 'regions' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Bases & Zonas Geográficas ({regions.length})
+            </h3>
+            <button
+              onClick={handleOpenNewRegion}
+              className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg shadow-amber-600/30 flex items-center space-x-1.5 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nova Base / Zona</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {regions.map((reg) => (
+              <div
+                key={reg.id}
+                onClick={() => handleOpenEditRegion(reg)}
+                className="bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 hover:border-amber-500/40 p-4 rounded-xl space-y-3 shadow-md transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-3.5 h-3.5 rounded-full border border-white/20 shrink-0"
+                      style={{ backgroundColor: reg.color || '#6366f1' }}
+                    ></span>
+                    <h4 className="font-bold text-sm text-white group-hover:text-amber-300 transition-colors">
+                      {reg.name}
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                    Base Ativa
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-400 line-clamp-2">{reg.description || 'Bairros de abrangência'}</p>
+
+                <div className="pt-2 border-t border-slate-800 text-[11px] font-semibold flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Deseja realmente excluir a base/zona "${reg.name}"?`)) {
+                        handleDeleteRegion(reg.id);
+                      }
+                    }}
+                    className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all text-xs flex items-center gap-1"
+                    title="Excluir Base / Zona"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Excluir</span>
+                  </button>
+                  <span className="text-amber-400">Editar Base →</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ABA 5: DADOS DA CAMPANHA */}
+      {activeTab === 'campaign' && campaign && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-sm font-extrabold text-white">Configurações Gerais da Campanha</h3>
+              <p className="text-xs text-slate-400">Informações oficiais exibidas nos relatórios, mapas e comprovantes</p>
+            </div>
+            {onUpdateCampaign && (
+              <button
+                onClick={() => setShowCampaignModal(true)}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg shadow-indigo-600/30 flex items-center space-x-1.5 transition-all cursor-pointer"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Editar Dados da Campanha</span>
+              </button>
+            )}
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">Nome Oficial da Campanha</span>
+                <div className="text-base font-extrabold text-white">{campaign.name}</div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">Candidato / Identificador</span>
+                <div className="text-base font-extrabold text-indigo-300">{campaign.candidateName || 'Não especificado'}</div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">Cidade / Estado</span>
+                <div className="text-sm font-bold text-slate-200">{campaign.cityState || 'Não especificado'}</div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">Status Operacional</span>
+                <div>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase">
+                    {campaign.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1 md:col-span-2">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">Período de Execução</span>
+                <div className="text-xs font-mono text-slate-300">
+                  {campaign.startDate} a {campaign.endDate}
+                </div>
+              </div>
+
+              {campaign.description && (
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1 md:col-span-2">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Descrição da Operação</span>
+                  <div className="text-xs text-slate-300 leading-relaxed">{campaign.description}</div>
+                </div>
+              )}
+
+            </div>
           </div>
         </div>
       )}
@@ -296,6 +725,9 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
         <ActionPointModal
           actionPoint={editingPoint}
           regions={regions}
+          teams={teams}
+          users={users}
+          currentUser={currentUser}
           onClose={() => setShowPointModal(false)}
           onSave={handleSavePoint}
           onDelete={onDeleteActionPoint}
@@ -315,6 +747,38 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
         />
       )}
 
+      {/* Modal de Base / Zona (Criar / Editar) */}
+      {showRegionModal && (
+        <RegionModal
+          region={editingRegion}
+          onClose={() => setShowRegionModal(false)}
+          onSave={handleSaveRegion}
+          onDelete={handleDeleteRegion}
+        />
+      )}
+
+      {/* Modal de Coordenador / Usuário (Criar / Editar) */}
+      {showUserModal && (
+        <UserModal
+          user={editingUser}
+          regions={regions}
+          teams={teams}
+          onClose={() => setShowUserModal(false)}
+          onSave={handleSaveUser}
+          onDelete={handleDeleteUser}
+        />
+      )}
+
+      {/* Modal de Campanha (Editar) */}
+      {showCampaignModal && campaign && onUpdateCampaign && (
+        <CampaignModal
+          campaign={campaign}
+          onClose={() => setShowCampaignModal(false)}
+          onSave={onUpdateCampaign}
+        />
+      )}
+
     </div>
   );
 };
+

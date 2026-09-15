@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { User } from '../../types';
-import { X, User as UserIcon, Mail, Phone, Lock, Image, CheckCircle2, Shield } from 'lucide-react';
+import { X, User as UserIcon, Mail, Phone, Lock, Camera, Upload, Trash2, CheckCircle2, Shield } from 'lucide-react';
 
 interface EditProfileModalProps {
   currentUser: User;
@@ -19,6 +19,54 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [password, setPassword] = useState(currentUser.password || '');
   const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl || '');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Processa arquivo ou foto da câmera e converte para Base64 otimizado
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setIsProcessingPhoto(false);
+          return;
+        }
+
+        // Redimensiona avatar para formato quadrado max 400x400
+        const maxDim = 400;
+        let width = img.width;
+        let height = img.height;
+        const minDim = Math.min(width, height);
+
+        canvas.width = maxDim;
+        canvas.height = maxDim;
+
+        // Centraliza e corta quadrado perfeito
+        const startX = (width - minDim) / 2;
+        const startY = (height - minDim) / 2;
+
+        ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, maxDim, maxDim);
+        const optimizedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+        setAvatarUrl(optimizedBase64);
+        setIsProcessingPhoto(false);
+      };
+      if (event.target?.result) {
+        img.src = event.target.result as string;
+      }
+    };
+    reader.readAsDataURL(file);
+    // Limpa valor para permitir selecionar o mesmo arquivo novamente se quiser
+    e.target.value = '';
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +97,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-white">Editar Perfil</h2>
-              <p className="text-[11px] text-slate-400">Atualize seus dados cadastrais e credenciais</p>
+              <p className="text-[11px] text-slate-400">Atualize sua foto, dados cadastrais e credenciais</p>
             </div>
           </div>
           <button
@@ -68,21 +116,79 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {/* Avatar Preview */}
-          <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-            <img
-              src={avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'}
-              alt="Avatar"
-              className="w-12 h-12 rounded-full object-cover border-2 border-indigo-500 shadow-md"
-            />
-            <div className="flex-1 space-y-1">
-              <label className="text-slate-300 font-medium text-[11px] block">URL da Foto de Perfil</label>
+          {/* Seção da Foto de Perfil com Câmera */}
+          <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-center gap-4">
+            {/* Avatar Preview */}
+            <div className="relative group">
+              <img
+                src={avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'}
+                alt="Foto de Perfil"
+                className="w-20 h-20 rounded-2xl object-cover border-2 border-indigo-500/60 shadow-lg shadow-indigo-500/10"
+              />
+              {isProcessingPhoto && (
+                <div className="absolute inset-0 bg-slate-950/70 rounded-2xl flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+            </div>
+
+            {/* Ações da Câmera / Upload */}
+            <div className="flex-1 space-y-2 text-center sm:text-left w-full">
+              <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
+                Foto de Perfil
+              </span>
+              <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                {/* Botão Câmera */}
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[11px] flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Câmera</span>
+                </button>
+
+                {/* Botão Galeria */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] border border-slate-700 flex items-center gap-1.5 transition-all"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Galeria</span>
+                </button>
+
+                {/* Botão Remover Foto se houver */}
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl('')}
+                    title="Remover foto"
+                    className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Tire uma selfie com a câmera ou selecione da sua galeria.
+              </p>
+
+              {/* Inputs Ocultos para Câmera e Galeria */}
               <input
-                type="url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://exemplo.com/sua-foto.jpg"
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[11px] text-white focus:outline-none focus:border-indigo-500"
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="user"
+                onChange={handlePhotoSelect}
+                className="hidden"
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoSelect}
+                className="hidden"
               />
             </div>
           </div>
@@ -102,12 +208,11 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-slate-300 font-medium">E-mail de Acesso</label>
+            <label className="text-slate-300 font-medium">E-mail de Acesso (Opcional)</label>
             <div className="relative">
               <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="email"
-                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-white focus:outline-none focus:border-indigo-500"

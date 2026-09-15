@@ -1,6 +1,6 @@
 import React from 'react';
-import { User, UserRole } from '../../types';
-import { Shield, MapPin, Users, FileText, Wifi, WifiOff, RefreshCw, Smartphone, Monitor, LogOut, PlusCircle, UserCheck } from 'lucide-react';
+import { User } from '../../types';
+import { Shield, MapPin, Users, FileText, RefreshCw, Smartphone, Monitor, LogOut, PlusCircle, Trash2, Key } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: User;
@@ -11,6 +11,7 @@ interface NavbarProps {
   isOnline: boolean;
   pendingSyncCount: number;
   onManualSync: () => void;
+  onResetAllData?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -21,12 +22,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   onTabChange,
   isOnline,
   pendingSyncCount,
-  onManualSync
+  onManualSync,
+  onResetAllData
 }) => {
   const getRoleBadge = () => {
     switch (currentUser.role) {
       case 'admin':
         return { label: '👑 Super Admin', bg: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30' };
+      case 'gestor_acesso':
+        return { label: '🔑 Gestor de Acessos', bg: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' };
       case 'coordenador':
         return { label: `📍 Coord. ${currentUser.regionName || 'Zona'}`, bg: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
       case 'campo':
@@ -41,6 +45,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleLogoClick = () => {
     if (currentUser.role === 'admin') {
       onTabChange('map');
+    } else if (currentUser.role === 'gestor_acesso') {
+      onTabChange('access-manager');
     } else if (currentUser.role === 'coordenador') {
       onTabChange('coordinator-dashboard');
     } else {
@@ -126,6 +132,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>Relatórios PDF</span>
                 </button>
               </>
+            )}
+
+            {currentUser.role === 'gestor_acesso' && (
+              <button
+                onClick={() => onTabChange('access-manager')}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
+                  activeTab === 'access-manager'
+                    ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <Key className="w-4 h-4" />
+                <span>Gestão de Acessos</span>
+              </button>
             )}
 
             {currentUser.role === 'coordenador' && (
@@ -220,6 +240,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               </div>
             </button>
+
+            {/* Botão de Reset de Dados (Zerar Operação para Teste do Zero) */}
+            {onResetAllData && currentUser.role === 'admin' && (
+              <button
+                type="button"
+                onClick={onResetAllData}
+                className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all text-xs flex items-center gap-1.5 font-bold"
+                title="Zerar todos os dados para testes de validação do zero"
+              >
+                <Trash2 className="w-4 h-4 text-rose-400" />
+                <span className="hidden lg:inline">Zerar Operação</span>
+              </button>
+            )}
 
             {/* Logout Button */}
             <button
