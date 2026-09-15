@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from '../../types';
-import { Shield, MapPin, Users, FileText, RefreshCw, Smartphone, Monitor, LogOut, PlusCircle, Trash2, Key } from 'lucide-react';
+import { Shield, MapPin, Users, FileText, RefreshCw, Smartphone, Monitor, LogOut, PlusCircle, Trash2, Key, Wifi, WifiOff } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: User;
