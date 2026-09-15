@@ -1,9 +1,14 @@
 import { Region, ActionPoint, Team, User, CheckIn } from '../types';
 
 const getApiUrl = (endpoint: string) => {
-  const currentPath = window.location.pathname;
-  const dir = currentPath.endsWith('/') ? currentPath : currentPath + '/';
-  return `${dir}api/${endpoint}`;
+  const path = window.location.pathname;
+  if (path.startsWith('/lab') || path.includes('/lab/')) {
+    return `/lab/api/${endpoint}`;
+  }
+  if (path.startsWith('/hml') || path.includes('/hml/')) {
+    return `/hml/api/${endpoint}`;
+  }
+  return `/api/${endpoint}`;
 };
 
 export const apiService = {

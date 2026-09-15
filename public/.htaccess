@@ -1,0 +1,25 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase ./
+  
+  # Permite acesso direto a arquivos e diretórios existentes (como /api e /assets)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+  
+  # Redireciona todas as rotas do SPA para index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Garantia de Tipos MIME para PWA e Módulos JS
+<IfModule mod_mime.c>
+  AddType application/javascript js mjs
+  AddType text/css css
+  AddType image/svg+xml svg
+  AddType application/manifest+json webmanifest json
+</IfModule>
+
+# Habilita CORS para APIs e Ativos
+<IfModule mod_headers.c>
+  Header set Access-Control-Allow-Origin "*"
+</IfModule>
