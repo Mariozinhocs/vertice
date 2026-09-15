@@ -176,7 +176,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         metrics={metrics}
         teams={teams}
         actionPoints={actionPoints}
+        regions={regions}
         checkIns={checkIns}
+        selectedDate={selectedDate}
         onClose={() => setModalType(null)}
         onNavigateToAudit={onNavigateToAudit}
         onAuditDecision={onAuditDecision}

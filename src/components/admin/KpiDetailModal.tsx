@@ -1,7 +1,26 @@
 import React, { useState } from 'react';
-import { Team, ActionPoint, CheckIn, OperationalMetrics, CheckInStatus } from '../../types';
+import { Team, ActionPoint, CheckIn, OperationalMetrics, CheckInStatus, Region } from '../../types';
 import { getImageUrl } from '../../services/imageService';
-import { X, Users, CheckCircle2, AlertTriangle, MapPin, Clock, Shield, Camera, Eye, ChevronRight, XCircle } from 'lucide-react';
+import {
+  X,
+  Users,
+  CheckCircle2,
+  AlertTriangle,
+  MapPin,
+  Clock,
+  Shield,
+  Camera,
+  Eye,
+  ChevronRight,
+  XCircle,
+  LayoutGrid,
+  List,
+  Layers,
+  Search,
+  Filter,
+  Building2,
+  User as UserIcon
+} from 'lucide-react';
 import { format } from 'date-fns';
 
 export type KpiModalType = 'teams' | 'validated' | 'pending' | 'points' | null;
@@ -11,7 +30,9 @@ interface KpiDetailModalProps {
   metrics: OperationalMetrics;
   teams: Team[];
   actionPoints: ActionPoint[];
+  regions?: Region[];
   checkIns: CheckIn[];
+  selectedDate?: string;
   onClose: () => void;
   onNavigateToAudit?: () => void;
   onAuditDecision?: (checkInId: string, newStatus: CheckInStatus, reason: string) => void;
@@ -22,7 +43,9 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
   metrics,
   teams,
   actionPoints,
+  regions = [],
   checkIns,
+  selectedDate,
   onClose,
   onNavigateToAudit,
   onAuditDecision
@@ -31,22 +54,42 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<ActionPoint | null>(null);
 
+  // Controle de Filtros e Modos de Visualização das Equipes
+  const [teamViewMode, setTeamViewMode] = useState<'grid' | 'list' | 'grouped'>('grid');
+  const [teamSearchTerm, setTeamSearchTerm] = useState<string>('');
+  const [teamRegionFilter, setTeamRegionFilter] = useState<string>('ALL');
+  const [teamStatusFilter, setTeamStatusFilter] = useState<string>('ALL');
+
   if (!type) return null;
 
   const validatedCheckIns = checkIns.filter((c) => c.status === 'validado');
   const pendingCheckIns = checkIns.filter((c) => c.status === 'pendente_analise');
-  const activeTeams = teams.filter((t) => t.status === 'ativa');
+
+  // Identifica atividade da equipe estritamente na data selecionada (somente do dia)
+  const getTeamActivityOnDate = (team: Team) => {
+    const teamCheckInsOnDate = checkIns.filter((c) => {
+      const matchDate = !selectedDate || c.timestamp.startsWith(selectedDate);
+      const matchTeam =
+        c.teamId === team.id ||
+        (c.teamName && team.name && c.teamName.toLowerCase().trim() === team.name.toLowerCase().trim()) ||
+        c.coordinatorId === team.coordinatorId;
+      return matchDate && matchTeam;
+    });
+
+    return {
+      isActive: teamCheckInsOnDate.length > 0,
+      count: teamCheckInsOnDate.length,
+      checkIns: teamCheckInsOnDate
+    };
+  };
+
+  const activeTeamsCount = teams.filter((t) => getTeamActivityOnDate(t).isActive).length;
 
   // Manipulador de clique em Equipe
   const handleTeamClick = (team: Team) => {
-    const teamChk = checkIns.find(
-      (c) =>
-        c.teamId === team.id ||
-        c.teamName?.toLowerCase().trim() === team.name?.toLowerCase().trim() ||
-        c.coordinatorId === team.coordinatorId
-    );
-    if (teamChk) {
-      setSelectedCheckIn(teamChk);
+    const activity = getTeamActivityOnDate(team);
+    if (activity.checkIns.length > 0) {
+      setSelectedCheckIn(activity.checkIns[0]);
     } else {
       setSelectedTeam(team);
     }
@@ -71,7 +114,7 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn font-['Inter',sans-serif]">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 max-h-[85vh] flex flex-col relative">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-5 max-h-[88vh] flex flex-col relative">
         
         {/* Cabeçalho do Modal Principal */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
@@ -99,13 +142,13 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
 
             <div>
               <h2 className="text-base font-bold text-white">
-                {type === 'teams' && `Equipes Ativas em Campo (${activeTeams.length})`}
+                {type === 'teams' && `Equipes Cadastradas & Ativas Hoje (${activeTeamsCount}/${teams.length})`}
                 {type === 'validated' && `Check-ins Validados & Auditados (${validatedCheckIns.length})`}
                 {type === 'pending' && `Check-ins em Análise de Auditoria (${pendingCheckIns.length})`}
                 {type === 'points' && `Cobertura dos Pontos de Ação (${metrics.pointsAttended}/${actionPoints.length})`}
               </h2>
               <p className="text-[11px] text-slate-400">
-                💡 Clique em qualquer item da lista abaixo para abrir a evidência fotográfica e detalhes completos
+                💡 Clique em qualquer item para detalhes
               </p>
             </div>
           </div>
@@ -122,47 +165,270 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
         {/* Conteúdo Dinâmico com Cards Clicáveis */}
         <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
           
-          {/* TIPO 1: EQUIPES ATIVAS */}
+          {/* TIPO 1: EQUIPES ATIVAS & CADASTRADAS */}
           {type === 'teams' && (
-            <div className="space-y-2.5">
-              {activeTeams.map((team) => {
-                const teamCheckIn = checkIns.find((c) => c.teamId === team.id);
-                return (
-                  <div
-                    key={team.id}
-                    onClick={() => handleTeamClick(team)}
-                    className="bg-slate-950/70 hover:bg-slate-950 border border-slate-800 hover:border-emerald-500/50 rounded-xl p-3.5 space-y-2 cursor-pointer transition-all group shadow-md"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-bold text-white text-sm group-hover:text-emerald-300 transition-colors flex items-center gap-1.5">
-                          <span>{team.name}</span>
-                          <Eye className="w-3.5 h-3.5 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </h3>
-                        <p className="text-slate-400 text-[11px]">Coordenador: {team.coordinatorName}</p>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase">
-                        {teamCheckIn ? 'Em Ação (Check-in OK)' : 'Aguardando Chegada'}
-                      </span>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                      <div className="flex flex-wrap gap-1 text-slate-300">
-                        <span className="text-slate-400">Integrantes ({team.members.length}):</span>
-                        {team.members.map((m) => (
-                          <span key={m.id} className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                            {m.name} ({m.role})
-                          </span>
-                        ))}
-                      </div>
-                      <span className="text-[10px] font-bold text-emerald-400 opacity-80 group-hover:opacity-100 flex items-center gap-1 shrink-0 ml-2">
-                        <span>Ver detalhes</span>
-                        <ChevronRight className="w-3 h-3" />
-                      </span>
-                    </div>
+            <div className="space-y-4">
+              {/* Barra de Filtros e Modos de Exibição */}
+              <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  
+                  {/* Busca por Nome / Coordenador / Base */}
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Buscar por equipe, coordenador ou base..."
+                      value={teamSearchTerm}
+                      onChange={(e) => setTeamSearchTerm(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:ring-1 focus:ring-emerald-500 focus:outline-none placeholder:text-slate-500"
+                    />
                   </div>
-                );
-              })}
+
+                  {/* Seleção de Modo de Exibição: Grade, Lista, Grupo por Base */}
+                  <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setTeamViewMode('grid')}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all ${
+                        teamViewMode === 'grid'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Exibir em Grade"
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Grade</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTeamViewMode('list')}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all ${
+                        teamViewMode === 'list'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Exibir em Lista"
+                    >
+                      <List className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Lista</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTeamViewMode('grouped')}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all ${
+                        teamViewMode === 'grouped'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Exibir em Grupo por Base"
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Por Base</span>
+                    </button>
+                  </div>
+
+                </div>
+
+                {/* Filtros por Base e por Status no Dia */}
+                <div className="flex flex-wrap items-center gap-3 text-xs pt-1 border-t border-slate-800/80">
+                  <div className="flex items-center gap-1 text-slate-400">
+                    <Filter className="w-3 h-3 text-emerald-400" />
+                    <span>Filtros:</span>
+                  </div>
+
+                  <div>
+                    <select
+                      value={teamRegionFilter}
+                      onChange={(e) => setTeamRegionFilter(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1 text-[11px] focus:ring-1 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="ALL">Todas as Bases ({regions.length})</option>
+                      {regions.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <select
+                      value={teamStatusFilter}
+                      onChange={(e) => setTeamStatusFilter(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1 text-[11px] focus:ring-1 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="ALL">Status no dia (Todas)</option>
+                      <option value="ACTIVE_TODAY">🟢 Ativas Hoje ({activeTeamsCount})</option>
+                      <option value="INACTIVE_TODAY">⚪ Sem Check-in Hoje ({teams.length - activeTeamsCount})</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lógica de Filtragem das Equipes */}
+              {(() => {
+                const filteredTeamsList = teams.filter((team) => {
+                  const activity = getTeamActivityOnDate(team);
+                  const baseName = regions.find((r) => r.id === team.regionId)?.name || team.regionName || '';
+
+                  // Filtro por Busca de Texto
+                  const matchesSearch =
+                    !teamSearchTerm ||
+                    team.name.toLowerCase().includes(teamSearchTerm.toLowerCase()) ||
+                    (team.coordinatorName && team.coordinatorName.toLowerCase().includes(teamSearchTerm.toLowerCase())) ||
+                    baseName.toLowerCase().includes(teamSearchTerm.toLowerCase());
+
+                  // Filtro por Base / Região
+                  const matchesRegion =
+                    teamRegionFilter === 'ALL' || team.regionId === teamRegionFilter;
+
+                  // Filtro por Status no Dia
+                  const matchesStatus =
+                    teamStatusFilter === 'ALL' ||
+                    (teamStatusFilter === 'ACTIVE_TODAY' && activity.isActive) ||
+                    (teamStatusFilter === 'INACTIVE_TODAY' && !activity.isActive);
+
+                  return matchesSearch && matchesRegion && matchesStatus;
+                });
+
+                if (filteredTeamsList.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-slate-500 space-y-2 bg-slate-950/40 rounded-xl border border-slate-800">
+                      <Users className="w-8 h-8 text-slate-600 mx-auto" />
+                      <p>Nenhuma equipe encontrada com os filtros selecionados.</p>
+                    </div>
+                  );
+                }
+
+                {/* Renderização individual do Card da Equipe */}
+                const renderTeamCard = (team: Team) => {
+                  const activity = getTeamActivityOnDate(team);
+                  const baseName = regions.find((r) => r.id === team.regionId)?.name || team.regionName || 'Base Não Definida';
+
+                  return (
+                    <div
+                      key={team.id}
+                      onClick={() => handleTeamClick(team)}
+                      className={`bg-slate-950/70 hover:bg-slate-950 border rounded-xl p-3.5 space-y-2.5 cursor-pointer transition-all group shadow-md ${
+                        activity.isActive
+                          ? 'border-emerald-500/40 hover:border-emerald-400 bg-emerald-950/10'
+                          : 'border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {/* Top Header: Nome da Equipe e Badge de Atividade do Dia */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-bold text-white text-sm group-hover:text-emerald-300 transition-colors flex items-center gap-1.5">
+                            <span>{team.name}</span>
+                            <Eye className="w-3.5 h-3.5 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </h3>
+                        </div>
+                        <span
+                          className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase border shrink-0 ${
+                            activity.isActive
+                              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                              : 'bg-slate-800/80 text-slate-400 border-slate-700'
+                          }`}
+                        >
+                          {activity.isActive ? `🟢 ATIVA HOJE (${activity.count})` : '⚪ SEM CHECK-IN HOJE'}
+                        </span>
+                      </div>
+
+                      {/* Exibição Obrigatória do Nome da Base e do Coordenador */}
+                      <div className="grid grid-cols-2 gap-2 text-xs bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                        <div className="flex items-center space-x-1.5 text-slate-300">
+                          <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <div className="truncate">
+                            <span className="text-[9px] text-slate-500 uppercase block leading-none">Base / Zona</span>
+                            <span className="font-semibold text-slate-200 text-[11px] truncate block">{baseName}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-1.5 text-slate-300">
+                          <UserIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <div className="truncate">
+                            <span className="text-[9px] text-slate-500 uppercase block leading-none">Coordenador</span>
+                            <span className="font-semibold text-slate-200 text-[11px] truncate block">{team.coordinatorName || 'Não atribuído'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Integrantes e Rodapé com Ação */}
+                      <div className="pt-1 flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-1 text-slate-400">
+                          <Users className="w-3 h-3 text-slate-500" />
+                          <span>{team.members.length} integrante(s)</span>
+                          {team.assignedPointIds && team.assignedPointIds.length > 0 && (
+                            <span className="text-slate-500">• {team.assignedPointIds.length} ponto(s)</span>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-400 opacity-80 group-hover:opacity-100 flex items-center gap-1 shrink-0">
+                          <span>Ver detalhes</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                };
+
+                {/* VISUALIZADOR 1: GRADE (GRID) */}
+                if (teamViewMode === 'grid') {
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {filteredTeamsList.map(renderTeamCard)}
+                    </div>
+                  );
+                }
+
+                {/* VISUALIZADOR 2: LISTA (LIST) */}
+                if (teamViewMode === 'list') {
+                  return (
+                    <div className="space-y-2">
+                      {filteredTeamsList.map(renderTeamCard)}
+                    </div>
+                  );
+                }
+
+                {/* VISUALIZADOR 3: GRUPO POR BASE (GROUPED) */}
+                if (teamViewMode === 'grouped') {
+                  const groupedMap = new Map<string, { baseName: string; teams: Team[] }>();
+                  filteredTeamsList.forEach((t) => {
+                    const bName = regions.find((r) => r.id === t.regionId)?.name || t.regionName || 'Bases Diversas';
+                    if (!groupedMap.has(bName)) {
+                      groupedMap.set(bName, { baseName: bName, teams: [] });
+                    }
+                    groupedMap.get(bName)!.teams.push(t);
+                  });
+
+                  return (
+                    <div className="space-y-4">
+                      {Array.from(groupedMap.values()).map((group) => {
+                        const activeInGroup = group.teams.filter((t) => getTeamActivityOnDate(t).isActive).length;
+                        return (
+                          <div key={group.baseName} className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 space-y-2.5">
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-4 h-4 text-indigo-400" />
+                                <h4 className="font-extrabold text-white text-xs">{group.baseName}</h4>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                                  {group.teams.length} equipe(s)
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-emerald-400 font-semibold">
+                                {activeInGroup} ativas hoje
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {group.teams.map(renderTeamCard)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+              })()}
             </div>
           )}
 

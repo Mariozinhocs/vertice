@@ -411,11 +411,29 @@ export const App: React.FC = () => {
     return Array.from(unique.values());
   };
 
+  // Identifica a quantidade de equipes únicas ativas no dia selecionado
+  const getActiveTeamsCountToday = (filteredCheckinsList: CheckIn[], teamsList: Team[]) => {
+    const activeTeamIds = new Set<string>();
+    filteredCheckinsList.forEach(c => {
+      const matchedTeam = teamsList.find(
+        t => t.id === c.teamId ||
+             (c.teamName && t.name && t.name.toLowerCase().trim() === c.teamName.toLowerCase().trim()) ||
+             t.coordinatorId === c.coordinatorId
+      );
+      if (matchedTeam) {
+        activeTeamIds.add(matchedTeam.id);
+      } else if (c.teamId) {
+        activeTeamIds.add(c.teamId);
+      }
+    });
+    return activeTeamIds.size;
+  };
+
   const metrics: OperationalMetrics = {
     totalTeams: teams.length,
     teamsScheduledToday: teams.length,
-    teamsActive: new Set(filteredCheckIns.filter((c) => c.status === 'validado').map(c => c.teamId)).size,
-    teamsPendingCheckIn: teams.length - new Set(filteredCheckIns.map(c => c.teamId)).size,
+    teamsActive: getActiveTeamsCountToday(filteredCheckIns, teams),
+    teamsPendingCheckIn: teams.length - getActiveTeamsCountToday(filteredCheckIns, teams),
     checkInsValidated: getUniqueCheckIns(filteredCheckIns.filter((c) => c.status === 'validado')).length,
     checkInsInAnalysis: getUniqueCheckIns(filteredCheckIns.filter((c) => c.status === 'pendente_analise')).length,
     checkInsRejected: getUniqueCheckIns(filteredCheckIns.filter((c) => c.status === 'rejeitado')).length,
