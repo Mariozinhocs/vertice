@@ -22,6 +22,7 @@ import {
   User as UserIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { CameraStatusBadge } from '../common/CameraStatusBadge';
 
 export type KpiModalType = 'teams' | 'validated' | 'pending' | 'points' | null;
 
@@ -315,13 +316,21 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
                           : 'border-slate-800 hover:border-slate-700'
                       }`}
                     >
-                      {/* Top Header: Nome da Equipe e Badge de Atividade do Dia */}
+                      {/* Top Header: Nome da Equipe, Câmera e Badge de Atividade do Dia */}
                       <div className="flex items-start justify-between gap-2">
-                        <div>
+                        <div className="flex items-center gap-2">
                           <h3 className="font-bold text-white text-sm group-hover:text-emerald-300 transition-colors flex items-center gap-1.5">
                             <span>{team.name}</span>
                             <Eye className="w-3.5 h-3.5 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </h3>
+                          <CameraStatusBadge
+                            size="sm"
+                            checkIns={checkIns}
+                            checkIn={activity.checkIns[0]}
+                            onOpenImage={(chk) => {
+                              setSelectedCheckIn(chk);
+                            }}
+                          />
                         </div>
                         <span
                           className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase border shrink-0 ${
@@ -748,8 +757,18 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">Ficha da Equipe</span>
-                <h3 className="text-base font-extrabold text-white">{selectedTeam.name}</h3>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">FICHA DA EQUIPE</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <h3 className="text-base font-extrabold text-white">{selectedTeam.name}</h3>
+                  <CameraStatusBadge
+                    checkIns={checkIns}
+                    checkIn={getTeamActivityOnDate(selectedTeam).checkIns[0]}
+                    onOpenImage={(chk) => {
+                      setSelectedTeam(null);
+                      setSelectedCheckIn(chk);
+                    }}
+                  />
+                </div>
               </div>
               <button
                 onClick={() => setSelectedTeam(null)}
@@ -759,30 +778,49 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
               </button>
             </div>
 
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-800">
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2.5 text-xs">
+              <div className="flex justify-between items-center py-1 border-b border-slate-800">
                 <span className="text-slate-400">Coordenador Responsável:</span>
-                <span className="font-bold text-white">{selectedTeam.coordinatorName}</span>
+                <span className="font-bold text-white">{selectedTeam.coordinatorName || 'Não informado'}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
+              <div className="flex justify-between items-center py-1 border-b border-slate-800">
                 <span className="text-slate-400">Status Operacional:</span>
                 <span className="font-bold text-emerald-400 uppercase">{selectedTeam.status}</span>
               </div>
+
               <div className="py-1">
-                <span className="text-slate-400 block mb-1.5 font-semibold">Integrantes da Equipe ({selectedTeam.members.length}):</span>
+                <span className="text-slate-400 block mb-2 font-semibold">Integrantes da Equipe ({selectedTeam.members.length}):</span>
                 <div className="space-y-1.5">
-                  {selectedTeam.members.map((m) => (
-                    <div key={m.id} className="bg-slate-900 p-2 rounded-lg border border-slate-800 flex justify-between text-[11px]">
-                      <span className="font-bold text-white">{m.name}</span>
-                      <span className="text-slate-400">{m.role}</span>
-                    </div>
-                  ))}
+                  {selectedTeam.members.map((m) => {
+                    const memberCheckIn = getTeamActivityOnDate(selectedTeam).checkIns.find(
+                      c => c.coordinatorId === m.id || (c.coordinatorName && c.coordinatorName.toLowerCase().includes(m.name.toLowerCase()))
+                    );
+
+                    return (
+                      <div key={m.id} className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white">{m.name}</span>
+                          <span className="text-slate-500">• {m.role}</span>
+                        </div>
+
+                        <CameraStatusBadge
+                          size="sm"
+                          checkIn={memberCheckIn || getTeamActivityOnDate(selectedTeam).checkIns[0]}
+                          onOpenImage={(chk) => {
+                            setSelectedTeam(null);
+                            setSelectedCheckIn(chk);
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
             <div className="pt-2 flex justify-end">
               <button
+                type="button"
                 onClick={() => setSelectedTeam(null)}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all"
               >

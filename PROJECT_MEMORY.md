@@ -59,6 +59,24 @@ O **Vértice** é um **Sistema de Gestão Operacional (SGO)** voltado para campa
 
 ---
 
+## 📷 Convenção dos Ícones de Câmera & Status de Horário (CameraStatusBadge)
+
+Cada equipe e ponto de ação exibe uma miniatura/badge com ícone de câmera dinâmico ao lado do nome (nas listagens, nos cards e na **FICHA DA EQUIPE**):
+
+1. **⚪ Câmera Cinza (`BEFORE_SCHEDULE`):**
+   * **Condição:** A hora atual é *anterior* ao horário agendado de início da ação (ex: antes das `08:00`) ou a data agendada é futura.
+   * **Comportamento ao Clicar:** Exibe modal informativo com o horário previsto para liberação do check-in.
+
+2. **🔴 Câmera Vermelha / Pulsante (`IN_SCHEDULE_NO_CHECKIN`):**
+   * **Condição:** A hora atual já está *no horário da ação* (ex: entre `08:00` e `18:00`), mas o check-in fotográfico *ainda não foi realizado*.
+   * **Comportamento ao Clicar:** Exibe alerta em destaque sobre pendência de check-in em ação em andamento.
+
+3. **🟢 Câmera Verde / Miniatura da Foto (`CHECKIN_DONE`):**
+   * **Condição:** O check-in com evidência fotográfica foi *realizado com sucesso* para a equipe no dia.
+   * **Comportamento ao Clicar:** Abre diretamente a imagem georreferenciada em tamanho expandido com dados de auditoria GPS.
+
+---
+
 ## ⚡ Comandos Úteis
 
 * **Desenvolvimento Local:** `npm run dev`
