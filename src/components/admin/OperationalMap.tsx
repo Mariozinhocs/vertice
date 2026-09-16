@@ -18,28 +18,43 @@ interface OperationalMapProps {
   currentUserRole?: string;
 }
 
-// Componente para recentralizar o mapa suavemente ao focar numa ação
-const MapViewportController: React.FC<{ targetCoords: [number, number] | null }> = ({ targetCoords }) => {
+interface TargetLoc {
+  lat: number;
+  lng: number;
+  id: number;
+}
+
+// Componente para recentralizar o mapa de forma garantida e imediata ao selecionar uma ação
+const MapViewportController: React.FC<{ targetLocation: TargetLoc | null }> = ({ targetLocation }) => {
   const map = useMap();
   useEffect(() => {
-    if (targetCoords) {
-      map.flyTo(targetCoords, 16, { duration: 1.2 });
+    if (targetLocation) {
+      map.stop();
+      map.setView([targetLocation.lat, targetLocation.lng], 16, { animate: true });
+      map.flyTo([targetLocation.lat, targetLocation.lng], 16, { duration: 0.8 });
     }
-  }, [targetCoords, map]);
+  }, [targetLocation, map]);
   return null;
 };
 
-// Componente para ajustar limites automáticos (Fit Bounds) quando a lista de pontos muda
-const MapAutoBoundsFitter: React.FC<{ points: ActionPoint[] }> = ({ points }) => {
+// Componente para enquadramento inicial inteligente sem sobrescrever a navegação do usuário
+const MapAutoBoundsFitter: React.FC<{ points: ActionPoint[]; selectedRegionId?: string }> = ({ points, selectedRegionId }) => {
   const map = useMap();
+  const prevRegionRef = React.useRef<string | undefined>(selectedRegionId);
+  const initialFittedRef = React.useRef<boolean>(false);
+
   useEffect(() => {
-    if (points && points.length > 0) {
+    const regionChanged = prevRegionRef.current !== selectedRegionId;
+    if (points && points.length > 0 && (!initialFittedRef.current || regionChanged)) {
       const bounds = L.latLngBounds(points.map((p) => [p.latitude, p.longitude]));
       if (bounds.isValid()) {
         map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+        initialFittedRef.current = true;
+        prevRegionRef.current = selectedRegionId;
       }
     }
-  }, [points, map]);
+  }, [selectedRegionId, points.length, map]);
+
   return null;
 };
 
@@ -157,7 +172,7 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
   
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [flyToCoords, setFlyToCoords] = useState<[number, number] | null>(null);
+  const [targetLocation, setTargetLocation] = useState<TargetLoc | null>(null);
 
   // Efeito para fechar droplet no ESC
   useEffect(() => {
@@ -200,7 +215,7 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
   };
 
   const handleFocusPoint = (point: ActionPoint) => {
-    setFlyToCoords([point.latitude, point.longitude]);
+    setTargetLocation({ lat: point.latitude, lng: point.longitude, id: Date.now() });
   };
 
   return (
@@ -263,7 +278,7 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
                   <div
                     key={point.id}
                     onClick={() => {
-                      setFlyToCoords([point.latitude, point.longitude]);
+                      setTargetLocation({ lat: point.latitude, lng: point.longitude, id: Date.now() });
                       setIsSearchOpen(false);
                     }}
                     className="p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800 border border-slate-800/80 hover:border-amber-500/50 flex items-center justify-between cursor-pointer transition-all group"
@@ -301,8 +316,8 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <MapViewportController targetCoords={flyToCoords} />
-          <MapAutoBoundsFitter points={displayPoints} />
+          <MapViewportController targetLocation={targetLocation} />
+          <MapAutoBoundsFitter points={displayPoints} selectedRegionId={selectedRegionId} />
 
           {/* Círculos de Raio dos Pontos de Atuação */}
           {displayPoints.map((point) => {
