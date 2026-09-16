@@ -72,21 +72,46 @@ export const App: React.FC = () => {
           apiService.getCheckIns()
         ]);
 
-        if (dbRegions && Array.isArray(dbRegions) && dbRegions.length > 0) setRegions(dbRegions);
-        if (dbUsers && Array.isArray(dbUsers) && dbUsers.length > 0) setUsers(dbUsers);
-        if (dbPoints && Array.isArray(dbPoints) && dbPoints.length > 0) {
-          setActionPoints((prev) => {
-            // Mescla sem duplicar nem perder pontos criados recentemente
-            const map = new Map<string, ActionPoint>();
-            dbPoints.forEach((p) => map.set(p.id, p));
-            prev.forEach((p) => {
-              if (!map.has(p.id)) map.set(p.id, p);
-            });
+        if (dbRegions && Array.isArray(dbRegions) && dbRegions.length > 0) {
+          setRegions((prev) => {
+            const map = new Map<string, Region>();
+            dbRegions.forEach((r) => map.set(r.id, r));
+            prev.forEach((r) => { if (!map.has(r.id)) map.set(r.id, r); });
             return Array.from(map.values());
           });
         }
-        if (dbTeams && Array.isArray(dbTeams) && dbTeams.length > 0) setTeams(dbTeams);
-        if (dbCheckIns && Array.isArray(dbCheckIns)) setCheckIns(dbCheckIns);
+        if (dbUsers && Array.isArray(dbUsers) && dbUsers.length > 0) {
+          setUsers((prev) => {
+            const map = new Map<string, User>();
+            dbUsers.forEach((u) => map.set(u.id, u));
+            prev.forEach((u) => { if (!map.has(u.id)) map.set(u.id, u); });
+            return Array.from(map.values());
+          });
+        }
+        if (dbPoints && Array.isArray(dbPoints) && dbPoints.length > 0) {
+          setActionPoints((prev) => {
+            const map = new Map<string, ActionPoint>();
+            dbPoints.forEach((p) => map.set(p.id, p));
+            prev.forEach((p) => { if (!map.has(p.id)) map.set(p.id, p); });
+            return Array.from(map.values());
+          });
+        }
+        if (dbTeams && Array.isArray(dbTeams) && dbTeams.length > 0) {
+          setTeams((prev) => {
+            const map = new Map<string, Team>();
+            dbTeams.forEach((t) => map.set(t.id, t));
+            prev.forEach((t) => { if (!map.has(t.id)) map.set(t.id, t); });
+            return Array.from(map.values());
+          });
+        }
+        if (dbCheckIns && Array.isArray(dbCheckIns)) {
+          setCheckIns((prev) => {
+            const map = new Map<string, CheckIn>();
+            dbCheckIns.forEach((c) => map.set(c.id, c));
+            prev.forEach((c) => { if (!map.has(c.id)) map.set(c.id, c); });
+            return Array.from(map.values());
+          });
+        }
       } catch (err) {
         console.warn('Hostinger DB fetch fallback to local cache', err);
       }
@@ -94,23 +119,12 @@ export const App: React.FC = () => {
 
     loadFromHostingerDB();
 
-    // Polling a cada 12 segundos para refletir cadastros feitos pelo celular (ex: "Teste Pq Idoso") no PC
+    // Polling a cada 10 segundos para sincronização bidirecional em tempo real (Mobile <-> PC <-> MySQL)
     const pollInterval = setInterval(() => {
-      apiService.getActionPoints().then((dbPoints) => {
-        if (dbPoints && Array.isArray(dbPoints) && dbPoints.length > 0) {
-          setActionPoints((prev) => {
-            const map = new Map<string, ActionPoint>();
-            dbPoints.forEach((p) => map.set(p.id, p));
-            prev.forEach((p) => {
-              if (!map.has(p.id)) map.set(p.id, p);
-            });
-            return Array.from(map.values());
-          });
-        }
-      }).catch(console.warn);
-    }, 12000);
+      loadFromHostingerDB();
+    }, 10000);
 
-    // Sincroniza também quando a aba ganha foco no computador
+    // Sincroniza também quando a aba ganha foco no computador ou celular
     const handleFocus = () => {
       loadFromHostingerDB();
     };
@@ -349,9 +363,20 @@ export const App: React.FC = () => {
 
   // Decisão de Auditoria (Aprovar / Rejeitar)
   const handleAuditDecision = (checkInId: string, newStatus: CheckInStatus, reason: string) => {
+    let updatedItem: CheckIn | null = null;
     setCheckIns((prev) =>
-      prev.map((c) => (c.id === checkInId ? { ...c, status: newStatus, statusReason: reason } : c))
+      prev.map((c) => {
+        if (c.id === checkInId) {
+          updatedItem = { ...c, status: newStatus, statusReason: reason };
+          return updatedItem;
+        }
+        return c;
+      })
     );
+
+    if (updatedItem) {
+      apiService.saveCheckIn(updatedItem);
+    }
 
     const auditLog: AuditLog = {
       id: `log-${Date.now()}`,
