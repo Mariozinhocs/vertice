@@ -466,6 +466,11 @@ function autoInitDatabase() {
             $db->exec("INSERT INTO `system_config` (`key`, `value`) VALUES ('schema_v3_initialized', '1') ON DUPLICATE KEY UPDATE `value` = '1'");
         }
 
+        // Garante que o ponto Teste Pq Idoso esteja sempre sincronizado no MySQL independentemente do histórico da tabela system_config
+        $db->exec("INSERT INTO `pontos_atuacao` (`id`, `campanha_id`, `regiao_id`, `nome`, `descricao`, `endereco`, `latitude`, `longitude`, `raio_tolerancia_metros`, `data_agendada`, `horario_inicio`, `horario_fim`, `equipe_atribuida_id`, `equipe_atribuida_nome`, `status`) VALUES
+        ('pt-teste-pq-idoso', 'cmp-manaus-2026', 'reg-cs1', 'Teste Pq Idoso', 'Ação Parque Municipal do Idoso / Fundação Doutor Thomas', 'Rua Doutor Thomas, Bairro Nossa Senhora das Graças - Manaus AM', -3.102000, -60.016000, 80, '2026-09-16', '08:00', '18:00', 'team-cs1-3', 'Equipe CS1-3', 'ativo')
+        ON DUPLICATE KEY UPDATE `nome` = VALUES(`nome`), `latitude` = VALUES(`latitude`), `longitude` = VALUES(`longitude`);");
+
     } catch (Exception $e) {
         error_log("Database autoInit error: " . $e->getMessage());
     }
