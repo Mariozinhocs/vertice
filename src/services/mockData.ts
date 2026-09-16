@@ -4834,6 +4834,23 @@ export const INITIAL_ACTION_POINTS: ActionPoint[] = [
     "assignedTeamId": "team-s-3",
     "assignedTeamName": "Equipe S-3",
     "status": "ativo"
+  },
+  {
+    "id": "pt-teste-pq-idoso",
+    "regionId": "reg-cs1",
+    "campaignId": "cmp-manaus-2026",
+    "name": "Teste Pq Idoso",
+    "description": "Ação Parque Municipal do Idoso / Fundação Doutor Thomas",
+    "address": "Rua Doutor Thomas, Bairro Nossa Senhora das Graças - Manaus AM",
+    "latitude": -3.102,
+    "longitude": -60.016,
+    "radiusMeters": 80,
+    "scheduledDate": "2026-09-16",
+    "startTime": "08:00",
+    "endTime": "18:00",
+    "assignedTeamId": "team-cs1-3",
+    "assignedTeamName": "Equipe CS1-3",
+    "status": "ativo"
   }
 ];
 

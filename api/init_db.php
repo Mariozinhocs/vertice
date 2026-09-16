@@ -408,8 +408,14 @@ function autoInitDatabase() {
             ('pt-r-3', 'cmp-manaus-2026', 'reg-r', 'Ponto de Ação R-3 (RURAL)', 'Operação de Campo em RURAL - Equipe R-3', 'Av. Principal de RURAL, Ponto 3 - Manaus AM', -2.915000, -60.025000, 100, '2026-09-16', '08:00', '18:00', 'team-r-3', 'Equipe R-3', 'ativo'),
             ('pt-s-1', 'cmp-manaus-2026', 'reg-s', 'Ponto de Ação S-1 (SUL)', 'Operação de Campo em SUL - Equipe S-1', 'Av. Principal de SUL, Ponto 1 - Manaus AM', -3.147000, -60.017000, 100, '2026-09-16', '08:00', '18:00', 'team-s-1', 'Equipe S-1', 'ativo'),
             ('pt-s-2', 'cmp-manaus-2026', 'reg-s', 'Ponto de Ação S-2 (SUL)', 'Operação de Campo em SUL - Equipe S-2', 'Av. Principal de SUL, Ponto 2 - Manaus AM', -3.142000, -60.012000, 100, '2026-09-16', '08:00', '18:00', 'team-s-2', 'Equipe S-2', 'ativo'),
-            ('pt-s-3', 'cmp-manaus-2026', 'reg-s', 'Ponto de Ação S-3 (SUL)', 'Operação de Campo em SUL - Equipe S-3', 'Av. Principal de SUL, Ponto 3 - Manaus AM', -3.137000, -60.007000, 100, '2026-09-16', '08:00', '18:00', 'team-s-3', 'Equipe S-3', 'ativo')
+            ('pt-s-3', 'cmp-manaus-2026', 'reg-s', 'Ponto de Ação S-3 (SUL)', 'Operação de Campo em SUL - Equipe S-3', 'Av. Principal de SUL, Ponto 3 - Manaus AM', -3.137000, -60.007000, 100, '2026-09-16', '08:00', '18:00', 'team-s-3', 'Equipe S-3', 'ativo'),
+            ('pt-teste-pq-idoso', 'cmp-manaus-2026', 'reg-cs1', 'Teste Pq Idoso', 'Ação Parque Municipal do Idoso / Fundação Doutor Thomas', 'Rua Doutor Thomas, Bairro Nossa Senhora das Graças - Manaus AM', -3.102000, -60.016000, 80, '2026-09-16', '08:00', '18:00', 'team-cs1-3', 'Equipe CS1-3', 'ativo')
             ON DUPLICATE KEY UPDATE `nome` = VALUES(`nome`);");
+
+        // Garante que o ponto Teste Pq Idoso esteja sempre sincronizado no MySQL
+        $db->exec("INSERT INTO `pontos_atuacao` (`id`, `campanha_id`, `regiao_id`, `nome`, `descricao`, `endereco`, `latitude`, `longitude`, `raio_tolerancia_metros`, `data_agendada`, `horario_inicio`, `horario_fim`, `equipe_atribuida_id`, `equipe_atribuida_nome`, `status`) VALUES
+        ('pt-teste-pq-idoso', 'cmp-manaus-2026', 'reg-cs1', 'Teste Pq Idoso', 'Ação Parque Municipal do Idoso / Fundação Doutor Thomas', 'Rua Doutor Thomas, Bairro Nossa Senhora das Graças - Manaus AM', -3.102000, -60.016000, 80, '2026-09-16', '08:00', '18:00', 'team-cs1-3', 'Equipe CS1-3', 'ativo')
+        ON DUPLICATE KEY UPDATE `nome` = VALUES(`nome`), `latitude` = VALUES(`latitude`), `longitude` = VALUES(`longitude`);");
 
             // Insere Equipes
             $db->exec("INSERT INTO `equipes` (`id`, `campanha_id`, `regiao_id`, `coordenador_id`, `coordenador_nome`, `nome`, `pontos_ids_json`, `membros_json`, `status`) VALUES
