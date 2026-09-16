@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { CameraStatusBadge } from '../common/CameraStatusBadge';
+import { TeamCardModal } from '../common/TeamCardModal';
 
 export type KpiModalType = 'teams' | 'validated' | 'pending' | 'points' | null;
 
@@ -54,12 +55,34 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
   const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<ActionPoint | null>(null);
+  const [teamForFichaModal, setTeamForFichaModal] = useState<Team | null>(null);
 
   // Controle de Filtros e Modos de Visualização das Equipes
   const [teamViewMode, setTeamViewMode] = useState<'grid' | 'list' | 'grouped'>('grid');
   const [teamSearchTerm, setTeamSearchTerm] = useState<string>('');
   const [teamRegionFilter, setTeamRegionFilter] = useState<string>('ALL');
   const [teamStatusFilter, setTeamStatusFilter] = useState<string>('ALL');
+
+  // Efeito para tratar o atalho da tecla ESC
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedCheckIn) {
+          setSelectedCheckIn(null);
+        } else if (selectedTeam) {
+          setSelectedTeam(null);
+        } else if (selectedPoint) {
+          setSelectedPoint(null);
+        } else if (teamForFichaModal) {
+          setTeamForFichaModal(null);
+        } else {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedCheckIn, selectedTeam, selectedPoint, teamForFichaModal, onClose]);
 
   if (!type) return null;
 
@@ -86,14 +109,9 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
 
   const activeTeamsCount = teams.filter((t) => getTeamActivityOnDate(t).isActive).length;
 
-  // Manipulador de clique em Equipe
+  // Manipulador de clique em Equipe (Abre a Ficha da Equipe com lista e fotos)
   const handleTeamClick = (team: Team) => {
-    const activity = getTeamActivityOnDate(team);
-    if (activity.checkIns.length > 0) {
-      setSelectedCheckIn(activity.checkIns[0]);
-    } else {
-      setSelectedTeam(team);
-    }
+    setTeamForFichaModal(team);
   };
 
   // Manipulador de clique em Ponto de Atuação
@@ -879,6 +897,15 @@ export const KpiDetailModal: React.FC<KpiDetailModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal FICHA DA EQUIPE */}
+      {teamForFichaModal && (
+        <TeamCardModal
+          team={teamForFichaModal}
+          checkIns={checkIns}
+          onClose={() => setTeamForFichaModal(null)}
+        />
       )}
 
     </div>

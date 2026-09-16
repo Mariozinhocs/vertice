@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Campaign, Team, ActionPoint, CheckIn, OperationalMetrics, Region, User } from '../../types';
 import { generatePDFReport, exportCSVReport, ReportPeriodType, WeeklyTeamSummary } from '../../services/reportService';
-import { FileText, Download, FileSpreadsheet, Calendar, CheckCircle2, AlertTriangle, Users, TrendingUp, Filter, Clock, Edit3 } from 'lucide-react';
+import { FileText, Download, FileSpreadsheet, Calendar, CheckCircle2, AlertTriangle, Users, TrendingUp, Filter, Clock, Edit3, LayoutGrid, List, Layers, Search, MapPin } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, subWeeks, parseISO, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CampaignModal } from './CampaignModal';
@@ -32,6 +32,9 @@ export const ReportsPanel: React.FC<ReportsPanelProps> = ({
   const [showCampaignModal, setShowCampaignModal] = useState<boolean>(false);
   const [periodMode, setPeriodMode] = useState<ReportPeriodType>('daily');
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [regionFilter, setRegionFilter] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'grouped'>('list');
 
   // Resolução Inteligente da Base/Zona da Equipe
   const getTeamRegionName = (team: Team) => {
@@ -354,9 +357,87 @@ export const ReportsPanel: React.FC<ReportsPanelProps> = ({
 
           <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
             <span className="text-[10px] text-slate-400 uppercase font-semibold">Evidências Fotografadas</span>
-            <div className="text-lg font-black text-purple-400 mt-0.5">
-              {periodMetrics.totalEvidences}
+          </div>
+        </div>
+
+        {/* Barra de Ferramentas Padronizada: Busca + Modos de Exibição (Grade / Lista / Por Base) + Filtros */}
+        <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-xl space-y-3 shadow-md mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            
+            {/* Busca por Texto */}
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar equipe, coordenador ou base no relatório..."
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+              />
             </div>
+
+            {/* Modo de Visualização */}
+            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'grid'
+                    ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/40 shadow-sm font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Grade</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'list'
+                    ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/40 shadow-sm font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>Lista</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('grouped')}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'grouped'
+                    ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/40 shadow-sm font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Por Base</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Linha de Filtros */}
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-800/80 text-xs">
+            <div className="flex items-center gap-1 text-slate-400 font-medium">
+              <Filter className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Filtros:</span>
+            </div>
+
+            <select
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
+              className="bg-slate-900 border border-slate-800 text-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="ALL">Todas as Bases ({regions.length})</option>
+              {regions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -377,113 +458,211 @@ export const ReportsPanel: React.FC<ReportsPanelProps> = ({
           </span>
         </div>
 
-        {/* VISÃO DIÁRIA */}
-        {periodMode === 'daily' ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px]">
-                <tr>
-                  <th className="p-3">Equipe</th>
-                  <th className="p-3">Base / Zona</th>
-                  <th className="p-3">Coordenador</th>
-                  <th className="p-3">Ponto Atribuído</th>
-                  <th className="p-3">Horário</th>
-                  <th className="p-3">Distância GPS</th>
-                  <th className="p-3">Evidência</th>
-                  <th className="p-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {teams.map((team) => {
+        {/* VISÃO DIÁRIA / SEMANAL COM NÍVEIS DE VISUALIZAÇÃO (GRADE / LISTA / POR BASE) */}
+        {(() => {
+          const reportTeams = teams.filter((team) => {
+            const regionName = getTeamRegionName(team);
+            const reg = regions.find((r) => r.name === regionName || r.id === team.regionId);
+            const matchRegion = regionFilter === 'ALL' || (reg && reg.id === regionFilter) || regionName === regionFilter;
+            const matchSearch = !searchTerm ||
+              team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              team.coordinatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              regionName.toLowerCase().includes(searchTerm.toLowerCase());
+            return matchRegion && matchSearch;
+          });
+
+          if (viewMode === 'grid') {
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {reportTeams.map((team) => {
                   const checkIn = periodCheckIns.find((c) => c.teamId === team.id);
                   const point = actionPoints.find((p) => team.assignedPointIds.includes(p.id));
                   const regionName = getTeamRegionName(team);
-
                   return (
-                    <tr key={`rep-${team.id}`} className="hover:bg-slate-950/40">
-                      <td className="p-3 font-bold text-white">{team.name}</td>
-                      <td className="p-3 text-indigo-300 font-semibold">{regionName}</td>
-                      <td className="p-3 text-slate-300">{team.coordinatorName}</td>
-                      <td className="p-3 text-slate-400">{point ? point.name : 'Não cadastrado'}</td>
-                      <td className="p-3 font-mono">{checkIn ? format(new Date(checkIn.timestamp), 'HH:mm') : '—'}</td>
-                      <td className="p-3 font-mono text-indigo-400">{checkIn ? `${checkIn.distanceCalculatedMeters} m` : '—'}</td>
-                      <td className="p-3">
-                        {checkIn?.imageUrl ? (
-                          <span className="text-emerald-400 font-bold">Sim (Anexa)</span>
-                        ) : (
-                          <span className="text-slate-500">Não</span>
-                        )}
-                      </td>
-                      <td className="p-3">
+                    <div key={`card-${team.id}`} className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3 shadow-md">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-bold text-sm text-white">{team.name}</h4>
+                          <span className="text-[10px] text-indigo-400 font-semibold uppercase">{regionName}</span>
+                        </div>
                         {checkIn ? (
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                              checkIn.status === 'validado'
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                                : checkIn.status === 'pendente_analise'
-                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                            }`}
-                          >
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${
+                            checkIn.status === 'validado' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                          }`}>
                             {checkIn.status.replace('_', ' ')}
                           </span>
                         ) : (
-                          <span className="text-slate-500">Sem Check-in</span>
+                          <span className="text-[10px] text-slate-500 font-semibold">Sem Check-in</span>
                         )}
-                      </td>
-                    </tr>
+                      </div>
+
+                      <div className="text-xs text-slate-400 space-y-1 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                        <p>Coord: <strong className="text-slate-200">{team.coordinatorName}</strong></p>
+                        <p>Ponto: <span className="text-indigo-300">{point ? point.name : '—'}</span></p>
+                        {checkIn && (
+                          <p className="font-mono text-[11px] text-slate-300">
+                            ⏰ {format(parseISO(checkIn.timestamp), 'HH:mm')} • GPS: {checkIn.distanceCalculatedMeters}m
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          /* VISÃO SEMANAL */
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px]">
-                <tr>
-                  <th className="p-3">Equipe</th>
-                  <th className="p-3">Base / Zona</th>
-                  <th className="p-3">Coordenador</th>
-                  <th className="p-3 text-center">Total Check-ins</th>
-                  <th className="p-3 text-center">Validados</th>
-                  <th className="p-3 text-center">Rejeitados</th>
-                  <th className="p-3 text-center">Pontos Visitados</th>
-                  <th className="p-3 text-center">Taxa Aprovação</th>
-                  <th className="p-3">Última Atividade</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {weeklySummaries.map((sum) => (
-                  <tr key={`weekly-${sum.teamId}`} className="hover:bg-slate-950/40">
-                    <td className="p-3 font-bold text-white">{sum.teamName}</td>
-                    <td className="p-3 text-indigo-300 font-semibold">{sum.regionName}</td>
-                    <td className="p-3 text-slate-300">{sum.coordinatorName}</td>
-                    <td className="p-3 text-center font-mono font-bold text-slate-200">{sum.totalCheckIns}</td>
-                    <td className="p-3 text-center font-mono text-emerald-400 font-bold">{sum.validatedCheckIns}</td>
-                    <td className="p-3 text-center font-mono text-rose-400 font-bold">{sum.rejectedCheckIns}</td>
-                    <td className="p-3 text-center font-mono text-indigo-300">{sum.pointsVisitedCount}</td>
-                    <td className="p-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        sum.complianceRate >= 80
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                          : sum.complianceRate >= 50
-                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                          : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                      }`}>
-                        {sum.complianceRate}%
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono text-slate-400">
-                      {sum.lastCheckInDate ? format(parseISO(sum.lastCheckInDate), 'dd/MM/yyyy HH:mm') : '—'}
-                    </td>
+              </div>
+            );
+          }
+
+          if (viewMode === 'grouped') {
+            return (
+              <div className="space-y-6">
+                {regions.map((reg) => {
+                  const teamsInGroup = reportTeams.filter((t) => {
+                    const rName = getTeamRegionName(t);
+                    return t.regionId === reg.id || rName === reg.name;
+                  });
+                  if (teamsInGroup.length === 0) return null;
+                  return (
+                    <div key={`grp-${reg.id}`} className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: reg.color || '#6366f1' }}></span>
+                          <h4 className="font-extrabold text-sm text-white">Base: {reg.name}</h4>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                            {teamsInGroup.length} Equipes
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {teamsInGroup.map((t) => (
+                          <div key={`grp-t-${t.id}`} className="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1">
+                            <h5 className="font-bold text-xs text-white">{t.name}</h5>
+                            <p className="text-[11px] text-slate-400">Coord: {t.coordinatorName}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          // MODO LISTA (TABLE) PADRÃO
+          return periodMode === 'daily' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px]">
+                  <tr>
+                    <th className="p-3">Equipe</th>
+                    <th className="p-3">Base / Zona</th>
+                    <th className="p-3">Coordenador</th>
+                    <th className="p-3">Ponto Atribuído</th>
+                    <th className="p-3">Horário</th>
+                    <th className="p-3">Distância GPS</th>
+                    <th className="p-3">Evidência</th>
+                    <th className="p-3">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {reportTeams.map((team) => {
+                    const checkIn = periodCheckIns.find((c) => c.teamId === team.id);
+                    const point = actionPoints.find((p) => team.assignedPointIds.includes(p.id));
+                    const regionName = getTeamRegionName(team);
+
+                    return (
+                      <tr key={`rep-${team.id}`} className="hover:bg-slate-950/40">
+                        <td className="p-3 font-bold text-white">{team.name}</td>
+                        <td className="p-3 text-indigo-300 font-semibold">{regionName}</td>
+                        <td className="p-3 text-slate-300">{team.coordinatorName}</td>
+                        <td className="p-3 text-slate-400">{point ? point.name : 'Não cadastrado'}</td>
+                        <td className="p-3 font-mono">{checkIn ? format(new Date(checkIn.timestamp), 'HH:mm') : '—'}</td>
+                        <td className="p-3 font-mono text-indigo-400">{checkIn ? `${checkIn.distanceCalculatedMeters} m` : '—'}</td>
+                        <td className="p-3">
+                          {checkIn?.imageUrl ? (
+                            <span className="text-emerald-400 font-bold">Sim (Anexa)</span>
+                          ) : (
+                            <span className="text-slate-500">Não</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {checkIn ? (
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                checkIn.status === 'validado'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                  : checkIn.status === 'pendente_analise'
+                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                              }`}
+                            >
+                              {checkIn.status.replace('_', ' ')}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">Sem Check-in</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px]">
+                  <tr>
+                    <th className="p-3">Equipe</th>
+                    <th className="p-3">Base / Zona</th>
+                    <th className="p-3">Coordenador</th>
+                    <th className="p-3 text-center">Total Check-ins</th>
+                    <th className="p-3 text-center">Validados</th>
+                    <th className="p-3 text-center">Rejeitados</th>
+                    <th className="p-3 text-center">Pontos Visitados</th>
+                    <th className="p-3 text-center">Taxa Aprovação</th>
+                    <th className="p-3">Última Atividade</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {weeklySummaries
+                    .filter((sum) => {
+                      const matchRegion = regionFilter === 'ALL' || sum.regionName === regionFilter;
+                      const matchSearch = !searchTerm ||
+                        sum.teamName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        sum.coordinatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        sum.regionName.toLowerCase().includes(searchTerm.toLowerCase());
+                      return matchRegion && matchSearch;
+                    })
+                    .map((sum) => (
+                    <tr key={`weekly-${sum.teamId}`} className="hover:bg-slate-950/40">
+                      <td className="p-3 font-bold text-white">{sum.teamName}</td>
+                      <td className="p-3 text-indigo-300 font-semibold">{sum.regionName}</td>
+                      <td className="p-3 text-slate-300">{sum.coordinatorName}</td>
+                      <td className="p-3 text-center font-mono font-bold text-slate-200">{sum.totalCheckIns}</td>
+                      <td className="p-3 text-center font-mono text-emerald-400 font-bold">{sum.validatedCheckIns}</td>
+                      <td className="p-3 text-center font-mono text-rose-400 font-bold">{sum.rejectedCheckIns}</td>
+                      <td className="p-3 text-center font-mono text-indigo-300">{sum.pointsVisitedCount}</td>
+                      <td className="p-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          sum.complianceRate >= 80
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                            : sum.complianceRate >= 50
+                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                        }`}>
+                          {sum.complianceRate}%
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono text-slate-400">
+                        {sum.lastCheckInDate ? format(parseISO(sum.lastCheckInDate), 'dd/MM/yyyy HH:mm') : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
 
       </div>
 

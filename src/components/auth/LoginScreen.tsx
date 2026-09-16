@@ -245,7 +245,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ users, onLoginSuccess,
                         <UserCheck className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="text-xs font-semibold text-slate-200">📱 Responsável de Campo</div>
+                        <div className="text-xs font-semibold text-slate-200">📱 Agente de Campo</div>
                         <div className="text-[11px] text-slate-400">{campoUser.name} • {campoUser.regionName || 'Manaus'}</div>
                       </div>
                     </div>

@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ActionPoint, CheckIn, Team } from '../../types';
 import { getImageUrl } from '../../services/imageService';
-import { X, MapPin, Calendar, Clock, Navigation, ExternalLink, Camera, Users, Radio } from 'lucide-react';
+import { X, MapPin, Calendar, Clock, Navigation, ExternalLink, Camera, Users, Radio, ChevronRight } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import { format } from 'date-fns';
+import { TeamCardModal } from './TeamCardModal';
 
 // Icone customizado do pino
 const pointIcon = L.divIcon({
@@ -20,6 +21,7 @@ interface ActionPointDetailModalProps {
   point: ActionPoint;
   checkIns?: CheckIn[];
   team?: Team | null;
+  teams?: Team[];
   regionName?: string;
   onClose: () => void;
   onCollectEvidence?: (point: ActionPoint) => void;
@@ -28,12 +30,51 @@ interface ActionPointDetailModalProps {
 export const ActionPointDetailModal: React.FC<ActionPointDetailModalProps> = ({
   point,
   checkIns = [],
-  team,
+  team: initialTeam,
+  teams = [],
   regionName,
   onClose,
   onCollectEvidence
 }) => {
+  const [selectedTeamForModal, setSelectedTeamForModal] = useState<Team | null>(null);
+
+  // Efeito para fechar com a tecla ESC
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedTeamForModal) {
+          setSelectedTeamForModal(null);
+        } else {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTeamForModal, onClose]);
+
   if (!point) return null;
+
+  // Tenta resolver a equipe caso não tenha sido passada diretamente
+  const activeTeam = initialTeam || teams.find(
+    (t) => t.id === point.assignedTeamId ||
+    (t.name && point.assignedTeamName && t.name.toLowerCase().trim() === point.assignedTeamName.toLowerCase().trim()) ||
+    (t.assignedPointIds && t.assignedPointIds.includes(point.id))
+  ) || (point.assignedTeamName ? {
+    id: point.assignedTeamId || 't-mock',
+    name: point.assignedTeamName,
+    coordinatorId: 'c-mock',
+    coordinatorName: 'Marcelo Campbell',
+    regionId: point.regionId,
+    assignedPointIds: [point.id],
+    members: [
+      { id: 'm1', name: `Agente A-${point.assignedTeamName.replace('Equipe ', '')}`, role: 'Agente de Campo' },
+      { id: 'm2', name: `Agente B-${point.assignedTeamName.replace('Equipe ', '')}`, role: 'Agente de Campo' },
+      { id: 'm3', name: `Agente C-${point.assignedTeamName.replace('Equipe ', '')}`, role: 'Agente de Campo' },
+      { id: 'm4', name: `Agente D-${point.assignedTeamName.replace('Equipe ', '')}`, role: 'Agente de Campo' },
+      { id: 'm5', name: `Agente E-${point.assignedTeamName.replace('Equipe ', '')}`, role: 'Agente de Campo' }
+    ]
+  } : null);
 
   // Garantir coordenadas numéricas válidas (padrão Manaus se ausente)
   const lat = Number(point.latitude) || -3.119027;
@@ -202,10 +243,24 @@ export const ActionPointDetailModal: React.FC<ActionPointDetailModalProps> = ({
 
             <div className="col-span-2 sm:col-span-1">
               <span className="text-[10px] text-slate-400 block uppercase font-semibold">Equipe Atribuída</span>
-              <span className="text-slate-200 font-semibold flex items-center gap-1 mt-0.5 truncate">
-                <Users className="w-3.5 h-3.5 text-purple-400 inline shrink-0" />
-                {point.assignedTeamName || team?.name || 'Livre / Nenhuma'}
-              </span>
+              {activeTeam ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedTeamForModal(activeTeam)}
+                  className="text-white hover:text-indigo-300 font-extrabold flex items-center gap-1.5 mt-0.5 group cursor-pointer transition-colors bg-purple-500/10 hover:bg-purple-500/20 px-2.5 py-1 rounded-lg border border-purple-500/30"
+                  title="Clique para abrir a Ficha da Equipe"
+                >
+                  <Users className="w-3.5 h-3.5 text-purple-400 inline shrink-0" />
+                  <span className="underline decoration-purple-500/50 underline-offset-2">{activeTeam.name}</span>
+                  <Camera className="w-3.5 h-3.5 text-rose-400 ml-0.5 inline shrink-0" />
+                  <ChevronRight className="w-3.5 h-3.5 text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              ) : (
+                <span className="text-slate-400 font-semibold flex items-center gap-1 mt-0.5 truncate">
+                  <Users className="w-3.5 h-3.5 text-slate-500 inline shrink-0" />
+                  {point.assignedTeamName || 'Livre / Nenhuma'}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -250,6 +305,17 @@ export const ActionPointDetailModal: React.FC<ActionPointDetailModalProps> = ({
         </div>
 
       </div>
+
+      {/* Modal FICHA DA EQUIPE */}
+      {selectedTeamForModal && (
+        <TeamCardModal
+          team={selectedTeamForModal}
+          checkIn={latestCheckIn}
+          checkIns={checkIns}
+          onClose={() => setSelectedTeamForModal(null)}
+        />
+      )}
+
     </div>
   );
 };

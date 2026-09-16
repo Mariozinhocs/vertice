@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ActionPoint, Team, CheckIn, CheckInStatus } from '../../types';
 import { evaluateCheckInGeofence } from '../../services/geoService';
-import { generateWatermarkedImage } from '../../services/imageService';
+import { generateWatermarkedImage, getBaseNameFromTeam } from '../../services/imageService';
+import { hasReachedPhotoLimit } from '../../services/evidenceRules';
 import { MapPin, Camera, AlertTriangle, CheckCircle2, XCircle, Clock, Navigation, Users, User, FileText, ArrowRight, ArrowLeft, CheckSquare, Square } from 'lucide-react';
 
 interface CheckInFlowProps {
@@ -10,6 +11,8 @@ interface CheckInFlowProps {
   initialPointId?: string;
   campaignName: string;
   isOnline: boolean;
+  checkIns?: CheckIn[];
+  userId?: string;
   onCompleteCheckIn: (checkIn: CheckIn) => void;
   onCancel: () => void;
 }
@@ -20,6 +23,8 @@ export const CheckInFlow: React.FC<CheckInFlowProps> = ({
   initialPointId,
   campaignName,
   isOnline,
+  checkIns = [],
+  userId,
   onCompleteCheckIn,
   onCancel,
 }) => {
@@ -52,6 +57,7 @@ export const CheckInFlow: React.FC<CheckInFlowProps> = ({
   } | null>(null);
 
   const selectedPoint = actionPoints.find((p) => p.id === selectedPointId) || actionPoints[0];
+  const limitCheck = hasReachedPhotoLimit(checkIns, selectedPointId, userId, team?.id);
 
   // Sincroniza contagem ao alternar Individual vs Grupo
   const handleToggleGroup = (groupMode: boolean) => {
@@ -126,8 +132,16 @@ export const CheckInFlow: React.FC<CheckInFlowProps> = ({
 
     try {
       const statusToApply = !isOnline ? 'pendente_sync' : evaluationResult?.status || 'validado';
+      const baseName = getBaseNameFromTeam(team.name);
+      const agentName = userId
+        ? (team.members?.find((m) => m.id === userId)?.name || team.members?.[0]?.name || team.coordinatorName)
+        : (team.members?.[0]?.name || team.coordinatorName || 'Agente de Campo');
+
       const watermarkBase64 = await generateWatermarkedImage(file, {
         campaignName,
+        baseName,
+        agentName,
+        coordinatorName: team.coordinatorName,
         teamName: team.name,
         pointName: selectedPoint.name,
         pointAddress: selectedPoint.address,
@@ -152,10 +166,17 @@ export const CheckInFlow: React.FC<CheckInFlowProps> = ({
       ? 'pendente_sync'
       : evaluationResult?.status || 'validado';
 
+    const baseName = getBaseNameFromTeam(team.name);
+    const agentName = userId
+      ? (team.members?.find((m) => m.id === userId)?.name || team.members?.[0]?.name || team.coordinatorName)
+      : (team.members?.[0]?.name || team.coordinatorName || 'Agente de Campo');
+
     const newCheckIn: CheckIn = {
       id: `chk-${Date.now()}`,
       teamId: team.id,
       teamName: team.name,
+      baseName,
+      agentName,
       actionPointId: selectedPoint.id,
       pointName: selectedPoint.name,
       coordinatorId: team.coordinatorId,
@@ -316,6 +337,24 @@ export const CheckInFlow: React.FC<CheckInFlowProps> = ({
             </div>
           )}
 
+          {/* Alerta de Limite Atingido (1 Foto por Evento) */}
+          {limitCheck.isBlocked && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-200 space-y-1.5 text-xs">
+              <div className="flex items-center space-x-2 font-bold text-amber-400">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>Evidência Já Registrada ({limitCheck.existingCount}/{limitCheck.maxAllowed} foto)</span>
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                Você já enviou a foto de evidência para a ação <strong className="text-white">{selectedPoint?.name}</strong>. A regra atual permite 1 foto por evento por usuário.
+              </p>
+              {limitCheck.existingCheckIn && (
+                <div className="pt-1 border-t border-amber-500/20 text-[10px] text-slate-300">
+                  Status do envio: <strong className="uppercase text-emerald-400">{limitCheck.existingCheckIn.status.replace('_', ' ')}</strong>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Next Button */}
           <div className="flex items-center space-x-3 pt-3">
             <button
@@ -325,11 +364,11 @@ export const CheckInFlow: React.FC<CheckInFlowProps> = ({
               Cancelar
             </button>
             <button
-              disabled={lat === null || loadingGps}
+              disabled={lat === null || loadingGps || limitCheck.isBlocked}
               onClick={() => setStep(2)}
               className="w-2/3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-indigo-600/30 flex items-center justify-center space-x-2 transition-all"
             >
-              <span>Avançar para Detalhes</span>
+              <span>{limitCheck.isBlocked ? 'Limite de Envios Atingido' : 'Avançar para Detalhes'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

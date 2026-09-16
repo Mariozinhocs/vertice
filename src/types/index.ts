@@ -80,6 +80,8 @@ export interface CheckIn {
   id: string;
   teamId: string;
   teamName: string;
+  baseName?: string;
+  agentName?: string;
   actionPointId: string;
   pointName: string;
   coordinatorId: string;
@@ -124,3 +126,53 @@ export interface OperationalMetrics {
   pointsUnattended: number;
   pendingEvidences: number;
 }
+
+export interface AgentDisclaimerLog {
+  id: string;
+  agentId: string;
+  agentName: string;
+  acceptedAtUtc: string;         // ISO 8601 UTC
+  agentLocalTimestamp: string;   // Ex: "16/09/2026 07:45:12"
+  timezoneOffset: string;        // Ex: "UTC-4 (Horário de Manaus)"
+  latitude?: number;
+  longitude?: number;
+  ipAddress?: string;
+  deviceModel?: string;
+  appVersion?: string;
+  status: 'accepted' | 'pending';
+}
+
+export interface AgentActionEvidencePhoto {
+  id: string;
+  url: string;
+  watermarkUrl?: string;
+  timestamp: string;
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
+}
+
+export interface AgentActionHistory {
+  id: string;
+  agentId: string;
+  actionPointId: string;
+  actionPointName: string;
+  regionName: string;
+  date: string;
+  photos: AgentActionEvidencePhoto[];
+}
+
+export interface AgentProfile {
+  id: string;
+  name: string;
+  role: string;
+  phone?: string;
+  email?: string;
+  teamName?: string;
+  regionName?: string;
+  todayDisclaimerStatus: 'accepted' | 'pending';
+  todayDisclaimerTime?: string;
+  disclaimerLogs: AgentDisclaimerLog[];
+  actionHistory: AgentActionHistory[];
+}
+

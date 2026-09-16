@@ -160,24 +160,39 @@ export const ActionPointModal: React.FC<ActionPointModalProps> = ({
     }
   };
 
-  // Trata a seleção direta por clique no mapa
+  // Efeito para fechar o modal com a tecla ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  // Trata a seleção direta por clique no mapa e realiza Reverse Geocoding Automático
   const handleMapSelect = async (clickedLat: number, clickedLng: number) => {
     const latFormatted = Number(clickedLat.toFixed(6));
     const lngFormatted = Number(clickedLng.toFixed(6));
     setLatitude(latFormatted);
     setLongitude(lngFormatted);
+    setIsGeocoding(true);
 
-    // Tenta reverse geocoding se o campo de endereço estiver vazio
-    if (!address.trim()) {
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${clickedLat}&lon=${clickedLng}`);
-        const data = await res.json();
-        if (data && data.display_name) {
-          setAddress(data.display_name);
-        }
-      } catch (err) {
-        // Falha silenciosa no reverse geocode
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${clickedLat}&lon=${clickedLng}`
+      );
+      const data = await res.json();
+      if (data && data.display_name) {
+        setAddress(data.display_name);
+      } else {
+        setAddress(`Ponto no Mapa (${latFormatted}, ${lngFormatted})`);
       }
+    } catch (err) {
+      setAddress(`Ponto no Mapa (${latFormatted}, ${lngFormatted})`);
+    } finally {
+      setIsGeocoding(false);
     }
   };
 
@@ -193,7 +208,7 @@ export const ActionPointModal: React.FC<ActionPointModalProps> = ({
       regionId,
       name: name.trim(),
       description: description.trim() || 'Ação de Campo Manaus',
-      address: address.trim(),
+      address: address.trim() || `Ponto no Mapa (${latitude}, ${longitude})`,
       latitude: Number(latitude),
       longitude: Number(longitude),
       radiusMeters: Number(radiusMeters) || 70,
@@ -217,6 +232,7 @@ export const ActionPointModal: React.FC<ActionPointModalProps> = ({
       }
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn font-['Inter',sans-serif]">
@@ -345,7 +361,7 @@ export const ActionPointModal: React.FC<ActionPointModalProps> = ({
           <div className="space-y-1">
             <label className="text-slate-300 font-medium flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Atribuir a uma Equipe ou Responsável de Campo</span>
+              <span>Atribuir a uma Equipe ou Agente de Campo</span>
             </label>
             <select
               value={assignedTeamId}
@@ -377,10 +393,9 @@ export const ActionPointModal: React.FC<ActionPointModalProps> = ({
             <div className="relative">
               <input
                 type="text"
-                required
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="Digite o endereço completo do local"
+                placeholder="Preenchido via mapa ou digite um endereço"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 pr-20"
               />
               <button

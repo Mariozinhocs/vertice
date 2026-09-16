@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { CheckIn, CheckInStatus, AuditLog } from '../../types';
+import { CheckIn, CheckInStatus, AuditLog, Region, Team, ActionPoint } from '../../types';
 import { getImageUrl } from '../../services/imageService';
-import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Eye, Camera, Clock, MapPin, Search, Trash2 } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Eye, Camera, Clock, MapPin, Search, Trash2, LayoutGrid, List, Layers, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface AuditPanelProps {
   checkIns: CheckIn[];
   auditLogs: AuditLog[];
+  regions?: Region[];
+  teams?: Team[];
+  actionPoints?: ActionPoint[];
   onAuditDecision: (checkInId: string, newStatus: CheckInStatus, reason: string) => void;
   onDeleteCheckIn?: (checkInId: string) => void;
   currentUserRole?: string;
@@ -15,6 +18,9 @@ interface AuditPanelProps {
 export const AuditPanel: React.FC<AuditPanelProps> = ({
   checkIns,
   auditLogs,
+  regions = [],
+  teams = [],
+  actionPoints = [],
   onAuditDecision,
   onDeleteCheckIn,
   currentUserRole
@@ -23,16 +29,25 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
   const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
   const [auditNotes, setAuditNotes] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [regionFilter, setRegionFilter] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'grouped'>('list');
 
   const pendingAuditCheckIns = checkIns.filter(
     (c) => c.status === 'pendente_analise' || c.status === 'rejeitado'
   );
 
   const filteredCheckIns = pendingAuditCheckIns.filter(
-    (c) =>
-      c.teamName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.coordinatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.pointName.toLowerCase().includes(searchTerm.toLowerCase())
+    (c) => {
+      const point = actionPoints.find(p => p.id === c.actionPointId || p.name === c.pointName);
+      const team = teams.find(t => t.id === c.teamId || t.name === c.teamName);
+      const regionId = point?.regionId || team?.regionId;
+      const matchRegion = regionFilter === 'ALL' || regionId === regionFilter;
+      const matchSearch = !searchTerm ||
+        c.teamName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.coordinatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.pointName.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchRegion && matchSearch;
+    }
   );
 
   const handleDecision = (newStatus: CheckInStatus) => {
@@ -47,7 +62,7 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-['Inter',sans-serif]">
       
       {/* Cabeçalho do Painel de Auditoria */}
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-wrap items-center justify-between gap-4">
@@ -63,13 +78,13 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
           </div>
         </div>
 
-        {/* Abas */}
+        {/* Abas com Pills */}
         <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
           <button
             onClick={() => setActiveTab('pending')}
             className={`px-4 py-2 rounded-lg transition-all ${
               activeTab === 'pending'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30 font-bold'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -79,7 +94,7 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
             onClick={() => setActiveTab('logs')}
             className={`px-4 py-2 rounded-lg transition-all ${
               activeTab === 'logs'
-                ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-bold'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -87,6 +102,89 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Toolbar Padronizada */}
+      {activeTab === 'pending' && (
+        <div className="bg-slate-900/90 border border-slate-800 p-3 rounded-xl space-y-3 shadow-md">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            
+            {/* Campo de Busca */}
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar equipe, coordenador ou ponto..."
+                className="w-full bg-slate-950/70 border border-slate-800 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
+              />
+            </div>
+
+            {/* Alternador de Modo de Exibição */}
+            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'grid'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-sm font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Grade</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'list'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-sm font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>Lista</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('grouped')}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'grouped'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-sm font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Por Base</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filtros em Dropdown */}
+          <div className="flex items-center gap-3 pt-2 border-t border-slate-800/80 text-xs">
+            <div className="flex items-center gap-1 text-slate-400 font-medium">
+              <Filter className="w-3.5 h-3.5 text-amber-400" />
+              <span>Filtros:</span>
+            </div>
+
+            <select
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
+              className="bg-slate-950 border border-slate-800 text-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+            >
+              <option value="ALL">Todas as Bases ({regions.length})</option>
+              {regions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'pending' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

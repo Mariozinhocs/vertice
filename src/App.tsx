@@ -52,15 +52,15 @@ export const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
   // Entidades Globais com Persistência em LocalStorage + Servidor MySQL
-  const [users, setUsers] = useState<User[]>(() => loadStorage('vertice_users', INITIAL_USERS));
-  const [campaigns, setCampaigns] = useState<Campaign[]>(() => loadStorage('vertice_campaigns', INITIAL_CAMPAIGNS));
-  const [regions, setRegions] = useState<Region[]>(() => loadStorage('vertice_regions', INITIAL_REGIONS));
-  const [actionPoints, setActionPoints] = useState<ActionPoint[]>(() => loadStorage('vertice_action_points', []));
-  const [teams, setTeams] = useState<Team[]>(() => loadStorage('vertice_teams', []));
-  const [checkIns, setCheckIns] = useState<CheckIn[]>(() => loadStorage('vertice_checkins', []));
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => loadStorage('vertice_audit_logs', []));
+  const [users, setUsers] = useState<User[]>(() => loadStorage('vertice_users_v3', INITIAL_USERS));
+  const [campaigns, setCampaigns] = useState<Campaign[]>(() => loadStorage('vertice_campaigns_v3', INITIAL_CAMPAIGNS));
+  const [regions, setRegions] = useState<Region[]>(() => loadStorage('vertice_regions_v3', INITIAL_REGIONS));
+  const [actionPoints, setActionPoints] = useState<ActionPoint[]>(() => loadStorage('vertice_action_points_v3', INITIAL_ACTION_POINTS));
+  const [teams, setTeams] = useState<Team[]>(() => loadStorage('vertice_teams_v3', INITIAL_TEAMS));
+  const [checkIns, setCheckIns] = useState<CheckIn[]>(() => loadStorage('vertice_checkins_v3', INITIAL_CHECKINS));
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => loadStorage('vertice_audit_logs_v3', INITIAL_AUDIT_LOGS));
 
-  // Sincronização Inicial com o Banco de Dados MySQL na Hospedagem Hostinger
+  // Sincronização Inicial e Periódica (Polling Tempo Real + Foco na Janela) com o Banco MySQL
   useEffect(() => {
     const loadFromHostingerDB = async () => {
       try {
@@ -74,8 +74,18 @@ export const App: React.FC = () => {
 
         if (dbRegions && Array.isArray(dbRegions) && dbRegions.length > 0) setRegions(dbRegions);
         if (dbUsers && Array.isArray(dbUsers) && dbUsers.length > 0) setUsers(dbUsers);
-        if (dbPoints && Array.isArray(dbPoints)) setActionPoints(dbPoints);
-        if (dbTeams && Array.isArray(dbTeams)) setTeams(dbTeams);
+        if (dbPoints && Array.isArray(dbPoints) && dbPoints.length > 0) {
+          setActionPoints((prev) => {
+            // Mescla sem duplicar nem perder pontos criados recentemente
+            const map = new Map<string, ActionPoint>();
+            dbPoints.forEach((p) => map.set(p.id, p));
+            prev.forEach((p) => {
+              if (!map.has(p.id)) map.set(p.id, p);
+            });
+            return Array.from(map.values());
+          });
+        }
+        if (dbTeams && Array.isArray(dbTeams) && dbTeams.length > 0) setTeams(dbTeams);
         if (dbCheckIns && Array.isArray(dbCheckIns)) setCheckIns(dbCheckIns);
       } catch (err) {
         console.warn('Hostinger DB fetch fallback to local cache', err);
@@ -83,7 +93,48 @@ export const App: React.FC = () => {
     };
 
     loadFromHostingerDB();
+
+    // Polling a cada 12 segundos para refletir cadastros feitos pelo celular (ex: "Teste Pq Idoso") no PC
+    const pollInterval = setInterval(() => {
+      apiService.getActionPoints().then((dbPoints) => {
+        if (dbPoints && Array.isArray(dbPoints) && dbPoints.length > 0) {
+          setActionPoints((prev) => {
+            const map = new Map<string, ActionPoint>();
+            dbPoints.forEach((p) => map.set(p.id, p));
+            prev.forEach((p) => {
+              if (!map.has(p.id)) map.set(p.id, p);
+            });
+            return Array.from(map.values());
+          });
+        }
+      }).catch(console.warn);
+    }, 12000);
+
+    // Sincroniza também quando a aba ganha foco no computador
+    const handleFocus = () => {
+      loadFromHostingerDB();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(pollInterval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
+
+  // Listener Global para fechar modais raiz com tecla ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isEditProfileOpen) {
+          setIsEditProfileOpen(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isEditProfileOpen]);
+
 
   // Filtros Globais
   const [selectedRegionId, setSelectedRegionId] = useState<string>('ALL');
@@ -92,27 +143,27 @@ export const App: React.FC = () => {
 
   // Auto-Salvar no LocalStorage como Cache Offline
   useEffect(() => {
-    try { localStorage.setItem('vertice_users', JSON.stringify(users)); } catch (e) { console.warn(e); }
+    try { localStorage.setItem('vertice_users_v3', JSON.stringify(users)); } catch (e) { console.warn(e); }
   }, [users]);
 
   useEffect(() => {
-    try { localStorage.setItem('vertice_regions', JSON.stringify(regions)); } catch (e) { console.warn(e); }
+    try { localStorage.setItem('vertice_regions_v3', JSON.stringify(regions)); } catch (e) { console.warn(e); }
   }, [regions]);
 
   useEffect(() => {
-    try { localStorage.setItem('vertice_action_points', JSON.stringify(actionPoints)); } catch (e) { console.warn(e); }
+    try { localStorage.setItem('vertice_action_points_v3', JSON.stringify(actionPoints)); } catch (e) { console.warn(e); }
   }, [actionPoints]);
 
   useEffect(() => {
-    try { localStorage.setItem('vertice_teams', JSON.stringify(teams)); } catch (e) { console.warn(e); }
+    try { localStorage.setItem('vertice_teams_v3', JSON.stringify(teams)); } catch (e) { console.warn(e); }
   }, [teams]);
 
   useEffect(() => {
-    try { localStorage.setItem('vertice_checkins', JSON.stringify(checkIns)); } catch (e) { console.warn(e); }
+    try { localStorage.setItem('vertice_checkins_v3', JSON.stringify(checkIns)); } catch (e) { console.warn(e); }
   }, [checkIns]);
 
   useEffect(() => {
-    try { localStorage.setItem('vertice_audit_logs', JSON.stringify(auditLogs)); } catch (e) { console.warn(e); }
+    try { localStorage.setItem('vertice_audit_logs_v3', JSON.stringify(auditLogs)); } catch (e) { console.warn(e); }
   }, [auditLogs]);
 
   // Ao logar, define a aba inicial de acordo com o perfil
@@ -362,10 +413,18 @@ export const App: React.FC = () => {
       setAuditLogs([]);
 
       try {
+        localStorage.removeItem('vertice_users');
+        localStorage.removeItem('vertice_regions');
         localStorage.removeItem('vertice_action_points');
         localStorage.removeItem('vertice_teams');
         localStorage.removeItem('vertice_checkins');
         localStorage.removeItem('vertice_audit_logs');
+        localStorage.removeItem('vertice_users_v2');
+        localStorage.removeItem('vertice_regions_v2');
+        localStorage.removeItem('vertice_action_points_v2');
+        localStorage.removeItem('vertice_teams_v2');
+        localStorage.removeItem('vertice_checkins_v2');
+        localStorage.removeItem('vertice_audit_logs_v2');
       } catch (e) {
         console.warn(e);
       }
@@ -551,6 +610,7 @@ export const App: React.FC = () => {
                 <OperationalMap
                   teams={teams}
                   actionPoints={actionPoints}
+                  regions={regions}
                   checkIns={filteredCheckIns}
                   currentUserRole={currentUser.role}
                   onAuditCheckIn={handleAuditDecision}
@@ -564,6 +624,9 @@ export const App: React.FC = () => {
                 <AuditPanel
                   checkIns={filteredCheckIns}
                   auditLogs={auditLogs}
+                  regions={regions}
+                  teams={teams}
+                  actionPoints={actionPoints}
                   onAuditDecision={handleAuditDecision}
                   onDeleteCheckIn={handleDeleteCheckIn}
                   currentUserRole={currentUser.role}

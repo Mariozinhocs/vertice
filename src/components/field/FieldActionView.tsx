@@ -73,7 +73,7 @@ export const FieldActionView: React.FC<FieldActionViewProps> = ({
               <Smartphone className="w-6 h-6 text-emerald-400" />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Responsável de Campo</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Agente de Campo</span>
               <h2 className="text-base font-bold text-white">{currentUser.name}</h2>
               <p className="text-xs text-slate-400">{currentUser.teamName || myTeam?.name}</p>
             </div>
@@ -167,6 +167,8 @@ export const FieldActionView: React.FC<FieldActionViewProps> = ({
             initialPointId={selectedCheckInPointId || currentActivePoint?.id}
             campaignName={campaignName}
             isOnline={isOnline}
+            checkIns={checkIns}
+            userId={currentUser.id}
             onCompleteCheckIn={(newCheckIn) => {
               onAddCheckIn(newCheckIn);
               setShowCheckInFlow(false);

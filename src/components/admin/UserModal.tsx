@@ -223,7 +223,7 @@ export const UserModal: React.FC<UserModalProps> = ({
               >
                 <option value="coordenador">📍 Coordenador por Zona</option>
                 <option value="admin">👑 Super Admin</option>
-                <option value="campo">📱 Responsável de Campo</option>
+                <option value="campo">📱 Agente de Campo</option>
                 <option value="gestor_acesso">🔑 Gestor de Acessos</option>
               </select>
             </div>

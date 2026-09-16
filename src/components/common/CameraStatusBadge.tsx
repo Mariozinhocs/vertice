@@ -177,7 +177,7 @@ export const CameraStatusBadge: React.FC<CameraStatusBadgeProps> = ({
                 <AlertCircle className="w-8 h-8 text-rose-400 mx-auto animate-bounce" />
                 <h4 className="font-bold text-rose-300 text-sm">Ação no Horário — Check-in Pendente!</h4>
                 <p className="text-slate-300">
-                  A ação agendada para <strong>{effectiveStartTime} às {effectiveEndTime}</strong> já está em andamento, mas o responsável de campo ainda não realizou o check-in fotográfico.
+                  A ação agendada para <strong>{effectiveStartTime} às {effectiveEndTime}</strong> já está em andamento, mas o agente de campo ainda não realizou o check-in fotográfico.
                 </p>
               </div>
             ) : (

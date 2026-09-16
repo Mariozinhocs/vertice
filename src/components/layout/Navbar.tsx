@@ -34,7 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       case 'coordenador':
         return { label: `📍 Coord. ${currentUser.regionName || 'Zona'}`, bg: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
       case 'campo':
-        return { label: '📱 Resp. Campo', bg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
+        return { label: '📱 Agente de Campo', bg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
       default:
         return { label: currentUser.role, bg: 'bg-slate-700 text-slate-300 border-slate-600' };
     }

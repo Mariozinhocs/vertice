@@ -84,7 +84,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({
   const getRoleLabel = (user: User): string => {
     if (user.role === 'admin') return 'Super Admin';
     if (user.role === 'coordenador') return 'Coordenador';
-    if (user.role === 'campo') return 'Responsável de Campo';
+    if (user.role === 'campo') return 'Agente de Campo';
     return 'Mobilizador(a)';
   };
 

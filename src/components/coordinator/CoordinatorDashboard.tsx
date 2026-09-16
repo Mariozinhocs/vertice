@@ -142,6 +142,8 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
             initialPointId={selectedCheckInPointId}
             campaignName={campaignName}
             isOnline={isOnline}
+            checkIns={checkIns}
+            userId={currentUser.id}
             onCompleteCheckIn={(newCheckIn) => {
               onAddCheckIn(newCheckIn);
               setShowCheckInFlow(false);

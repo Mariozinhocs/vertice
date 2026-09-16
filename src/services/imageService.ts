@@ -10,6 +10,9 @@ export interface StructuredAddress {
 
 export interface WatermarkOptions {
   campaignName?: string;
+  baseName?: string;
+  agentName?: string;
+  coordinatorName?: string;
   teamName?: string;
   pointName?: string;
   pointAddress?: string;
@@ -318,6 +321,26 @@ function formatTimestampLong(date: Date): string {
   return `${day} de ${monthStr} de ${year}, ${hours}:${minutes}:${seconds}`;
 }
 
+export function getBaseNameFromTeam(teamName?: string, regionName?: string): string {
+  if (regionName && regionName.trim().length > 0) return regionName;
+  if (!teamName) return 'CENTRAL';
+
+  const lower = teamName.toLowerCase();
+  if (lower.includes('c-') || lower.includes('central')) return 'CENTRAL';
+  if (lower.includes('co-') || lower.includes('centro-oeste')) return 'CENTRO-OESTE';
+  if (lower.includes('cs1-') || lower.includes('centro-sul 1')) return 'CENTRO-SUL 1';
+  if (lower.includes('cs2-') || lower.includes('centro-sul 2')) return 'CENTRO-SUL 2';
+  if (lower.includes('l1-') || lower.includes('leste 1')) return 'LESTE 1';
+  if (lower.includes('l2-') || lower.includes('leste 2')) return 'LESTE 2';
+  if (lower.includes('n1-') || lower.includes('norte 1')) return 'NORTE 1';
+  if (lower.includes('n2-') || lower.includes('norte 2')) return 'NORTE 2';
+  if (lower.includes('o-') || lower.includes('oeste')) return 'OESTE';
+  if (lower.includes('s-') || lower.includes('sul')) return 'SUL';
+  if (lower.includes('r-') || lower.includes('rural')) return 'RURAL';
+
+  return 'CENTRAL';
+}
+
 /**
  * Aplica a marca d'água georreferenciada de evidência com mini mapa no canto superior esquerdo
  * e metadados com endereço completo no canto superior direito.
@@ -371,18 +394,23 @@ export async function generateWatermarkedImage(
       const dateStr = options.dateStr || formatTimestampLong(new Date());
 
       // Coordenadas
-      const coordsStr = `${options.lat.toFixed(6)},${options.lng.toFixed(6)}`;
+      const coordsStr = `GPS: ${options.lat.toFixed(6)}, ${options.lng.toFixed(6)}`;
 
-      // Linhas do bloco de metadados
-      const metaLines = [
-        dateStr,
-        coordsStr,
-        addressInfo.road,
-        addressInfo.neighborhood,
-        addressInfo.cityState,
-        addressInfo.postalCode,
-        addressInfo.country
-      ];
+      // Metadados estruturados de Base e Agente conforme o sistema
+      const baseText = options.baseName ? `BASE: ${options.baseName.toUpperCase()}` : null;
+      const agentText = options.agentName ? `AGENTE: ${options.agentName}` : (options.coordinatorName ? `COORD: ${options.coordinatorName}` : null);
+      const teamText = options.teamName ? `EQUIPE: ${options.teamName}` : null;
+
+      const metaLines: string[] = [];
+      if (baseText) metaLines.push(baseText);
+      if (agentText) metaLines.push(agentText);
+      if (teamText) metaLines.push(teamText);
+      metaLines.push(dateStr);
+      metaLines.push(coordsStr);
+      metaLines.push(addressInfo.road);
+      metaLines.push(`${addressInfo.neighborhood}, ${addressInfo.cityState}`);
+      if (addressInfo.postalCode) metaLines.push(addressInfo.postalCode);
+      metaLines.push(addressInfo.country);
 
       // ==========================================
       // CANTO SUPERIOR ESQUERDO: MINI MAPA COM PIN
