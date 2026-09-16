@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Circle, Tooltip } from 'react-leaflet';
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Circle, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Team, ActionPoint, CheckIn, CheckInStatus, Region } from '../../types';
 import { ActionPointDetailModal } from '../common/ActionPointDetailModal';
 import { getImageUrl } from '../../services/imageService';
-import { MapPin, CheckCircle2, AlertTriangle, XCircle, Clock, Users, Camera, X, Shield, Navigation, Phone, Trash2 } from 'lucide-react';
+import { MapPin, CheckCircle2, AlertTriangle, XCircle, Clock, Users, Camera, X, Shield, Navigation, Phone, Trash2, Search, Crosshair } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface OperationalMapProps {
@@ -12,10 +12,36 @@ interface OperationalMapProps {
   actionPoints: ActionPoint[];
   regions?: Region[];
   checkIns: CheckIn[];
+  selectedRegionId?: string;
   onAuditCheckIn?: (checkInId: string, newStatus: CheckInStatus, reason: string) => void;
   onDeleteCheckIn?: (checkInId: string) => void;
   currentUserRole?: string;
 }
+
+// Componente para recentralizar o mapa suavemente ao focar numa ação
+const MapViewportController: React.FC<{ targetCoords: [number, number] | null }> = ({ targetCoords }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (targetCoords) {
+      map.flyTo(targetCoords, 16, { duration: 1.2 });
+    }
+  }, [targetCoords, map]);
+  return null;
+};
+
+// Componente para ajustar limites automáticos (Fit Bounds) quando a lista de pontos muda
+const MapAutoBoundsFitter: React.FC<{ points: ActionPoint[] }> = ({ points }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (points && points.length > 0) {
+      const bounds = L.latLngBounds(points.map((p) => [p.latitude, p.longitude]));
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+      }
+    }
+  }, [points, map]);
+  return null;
+};
 
 // Criação de Ícones customizados do Leaflet em SVG para cada status das equipes
 const createStatusMarkerIcon = (status: CheckInStatus | 'no_checkin' | 'point_fixed') => {
@@ -118,6 +144,7 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
   actionPoints,
   regions,
   checkIns,
+  selectedRegionId = 'ALL',
   onAuditCheckIn,
   onDeleteCheckIn,
   currentUserRole
@@ -127,11 +154,20 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
   const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState<boolean>(false);
   const [modalActionPoint, setModalActionPoint] = useState<ActionPoint | null>(null);
+  
+  const [flyToCoords, setFlyToCoords] = useState<[number, number] | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Filtra ações pela região/zona selecionada no dashboard
+  const displayPoints = actionPoints.filter((p) => {
+    if (!selectedRegionId || selectedRegionId === 'ALL') return true;
+    return p.regionId === selectedRegionId;
+  });
 
   // Centro padrão do mapa (Manaus - AM por padrão)
-  const defaultCenter: [number, number] = actionPoints[0]
-    ? [actionPoints[0].latitude, actionPoints[0].longitude]
-    : [-3.1190, -60.0217];
+  const defaultCenter: [number, number] = displayPoints[0]
+    ? [displayPoints[0].latitude, displayPoints[0].longitude]
+    : [-3.1020, -60.0160]; // Padrão Fundação Doutor Thomas / Parque do Idoso
 
   const handleSelectTeamMarker = (team: Team, checkIn: CheckIn | null) => {
     setSelectedTeam(team);
@@ -140,24 +176,41 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
     setSelectedPoint(point || null);
   };
 
-  const handleSelectPointMarker = (point: ActionPoint) => {
-    setSelectedPoint(point);
-    const team = teams.find((t) => t.assignedPointIds.includes(point.id));
-    setSelectedTeam(team || null);
-    const checkIn = checkIns.find((c) => c.actionPointId === point.id);
-    setSelectedCheckIn(checkIn || null);
+  const handleFocusPoint = (point: ActionPoint) => {
+    setFlyToCoords([point.latitude, point.longitude]);
+    setModalActionPoint(point);
   };
-
-  const isDrawerOpen = selectedTeam !== null || selectedPoint !== null;
 
   return (
     <div className="relative w-full h-[calc(100vh-4rem)] bg-slate-950 flex font-['Inter',sans-serif]">
       
+      {/* Barra de Busca e Localização Rápida no Canto Superior do Mapa */}
+      <div className="absolute top-4 left-4 z-[500] bg-slate-900/90 backdrop-blur-md p-2 rounded-xl border border-slate-800 shadow-2xl flex items-center gap-2 max-w-sm w-full">
+        <Search className="w-4 h-4 text-amber-400 shrink-0 ml-1" />
+        <select
+          onChange={(e) => {
+            const found = displayPoints.find((p) => p.id === e.target.value);
+            if (found) handleFocusPoint(found);
+          }}
+          defaultValue=""
+          className="w-full bg-slate-950 text-white text-xs rounded-lg px-2 py-1.5 border border-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
+        >
+          <option value="" disabled>
+            🔍 Encontrar Ação no Mapa (ex: Teste Pq Idoso)...
+          </option>
+          {displayPoints.map((p) => (
+            <option key={p.id} value={p.id}>
+              📍 {p.name} ({p.assignedTeamName || 'Geral'})
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Mapa Leaflet */}
       <div className="flex-1 h-full z-10">
         <MapContainer
           center={defaultCenter}
-          zoom={12}
+          zoom={13}
           scrollWheelZoom={true}
           style={{ width: '100%', height: '100%' }}
         >
@@ -165,9 +218,11 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          <MapViewportController targetCoords={flyToCoords} />
+          <MapAutoBoundsFitter points={displayPoints} />
 
           {/* Círculos de Raio dos Pontos de Atuação */}
-          {actionPoints.map((point) => {
+          {displayPoints.map((point) => {
             const hasCheckIn = checkIns.some((c) => c.actionPointId === point.id && c.status === 'validado');
             const region = regions?.find((r) => r.id === point.regionId);
             const baseColor = region?.color || '#8b5cf6';
@@ -200,7 +255,6 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
                     },
                   }}
                 >
-                  {/* Rollover Tooltip Simples (Base / Equipe) com Interatividade Desativada (Evita Tremor no Mouse) */}
                   <Tooltip
                     direction="top"
                     offset={[0, -36]}
@@ -212,7 +266,7 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
                       <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0 shadow-sm" style={{ backgroundColor: baseColor }}></span>
                       <span className="font-bold text-white">{regionName}</span>
                       <span className="text-slate-400">/</span>
-                      <span className="text-indigo-300 font-medium">{teamName}</span>
+                      <span className="text-indigo-300 font-medium">{point.name}</span>
                     </div>
                   </Tooltip>
                 </Marker>

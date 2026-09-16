@@ -612,6 +612,7 @@ export const App: React.FC = () => {
                   actionPoints={actionPoints}
                   regions={regions}
                   checkIns={filteredCheckIns}
+                  selectedRegionId={selectedRegionId}
                   currentUserRole={currentUser.role}
                   onAuditCheckIn={handleAuditDecision}
                   onDeleteCheckIn={handleDeleteCheckIn}
