@@ -155,13 +155,36 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
   const [showPhotoModal, setShowPhotoModal] = useState<boolean>(false);
   const [modalActionPoint, setModalActionPoint] = useState<ActionPoint | null>(null);
   
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [flyToCoords, setFlyToCoords] = useState<[number, number] | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Efeito para fechar droplet no ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isSearchOpen) {
+        setIsSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSearchOpen]);
 
   // Filtra ações pela região/zona selecionada no dashboard
   const displayPoints = actionPoints.filter((p) => {
     if (!selectedRegionId || selectedRegionId === 'ALL') return true;
     return p.regionId === selectedRegionId;
+  });
+
+  // Filtra pontos compatíveis com o texto digitado na busca
+  const filteredSearchPoints = displayPoints.filter((p) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase().trim();
+    return (
+      p.name.toLowerCase().includes(term) ||
+      (p.address && p.address.toLowerCase().includes(term)) ||
+      (p.assignedTeamName && p.assignedTeamName.toLowerCase().includes(term))
+    );
   });
 
   // Centro padrão do mapa (Manaus - AM por padrão)
@@ -178,33 +201,93 @@ export const OperationalMap: React.FC<OperationalMapProps> = ({
 
   const handleFocusPoint = (point: ActionPoint) => {
     setFlyToCoords([point.latitude, point.longitude]);
-    setModalActionPoint(point);
   };
 
   return (
     <div className="relative w-full h-[calc(100vh-4rem)] bg-slate-950 flex font-['Inter',sans-serif]">
       
-      {/* Barra de Busca e Localização Rápida no Canto Superior do Mapa */}
-      <div className="absolute top-4 left-4 z-[500] bg-slate-900/90 backdrop-blur-md p-2 rounded-xl border border-slate-800 shadow-2xl flex items-center gap-2 max-w-sm w-full">
-        <Search className="w-4 h-4 text-amber-400 shrink-0 ml-1" />
-        <select
-          onChange={(e) => {
-            const found = displayPoints.find((p) => p.id === e.target.value);
-            if (found) handleFocusPoint(found);
-          }}
-          defaultValue=""
-          className="w-full bg-slate-950 text-white text-xs rounded-lg px-2 py-1.5 border border-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
+      {/* Botão de Pesquisa Inicialmente Fechado & Droplet Interativo */}
+      {!isSearchOpen ? (
+        <button
+          type="button"
+          onClick={() => setIsSearchOpen(true)}
+          className="absolute top-4 left-14 z-[500] bg-slate-900/90 hover:bg-slate-800 text-amber-400 p-2.5 rounded-xl border border-slate-700/80 shadow-2xl flex items-center gap-2 font-semibold text-xs transition-all active:scale-95"
+          title="Buscar e centralizar ação no mapa"
         >
-          <option value="" disabled>
-            🔍 Encontrar Ação no Mapa (ex: Teste Pq Idoso)...
-          </option>
-          {displayPoints.map((p) => (
-            <option key={p.id} value={p.id}>
-              📍 {p.name} ({p.assignedTeamName || 'Geral'})
-            </option>
-          ))}
-        </select>
-      </div>
+          <Search className="w-4 h-4" />
+          <span className="hidden sm:inline text-slate-200">Pesquisar Ação</span>
+        </button>
+      ) : (
+        <div className="absolute top-4 left-14 z-[500] bg-slate-900/95 border border-slate-700/90 rounded-2xl shadow-2xl p-3 w-80 space-y-2 font-sans animate-fadeIn backdrop-blur-md">
+          {/* Caixa de Digitação com Botão de Fechar */}
+          <div className="flex items-center gap-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+            <Search className="w-4 h-4 text-amber-400 shrink-0" />
+            <input
+              type="text"
+              autoFocus
+              placeholder="Digite o nome da ação ou equipe..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-transparent text-white text-xs focus:outline-none placeholder:text-slate-500"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="text-slate-500 hover:text-white text-xs font-bold px-1"
+              >
+                ✕
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(false)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 shrink-0"
+              title="Fechar (ESC)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Lista de Opções Compatíveis que Centralizam no Mapa ao Selecionar */}
+          {filteredSearchPoints.length === 0 ? (
+            <div className="text-[11px] text-slate-500 p-3 text-center font-medium">
+              Nenhuma ação encontrada.
+            </div>
+          ) : (
+            <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+              {filteredSearchPoints.map((point) => {
+                const region = regions?.find((r) => r.id === point.regionId);
+                const baseColor = region?.color || '#8b5cf6';
+                return (
+                  <div
+                    key={point.id}
+                    onClick={() => {
+                      setFlyToCoords([point.latitude, point.longitude]);
+                      setIsSearchOpen(false);
+                    }}
+                    className="p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800 border border-slate-800/80 hover:border-amber-500/50 flex items-center justify-between cursor-pointer transition-all group"
+                    title={`Clique para centralizar no mapa em ${point.name}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: baseColor }} />
+                      <div>
+                        <strong className="text-white text-xs font-bold block group-hover:text-amber-300 transition-colors">
+                          {point.name}
+                        </strong>
+                        <span className="text-[10px] text-slate-400 block line-clamp-1">
+                          {point.assignedTeamName ? `Equipe: ${point.assignedTeamName}` : point.address}
+                        </span>
+                      </div>
+                    </div>
+                    <Crosshair className="w-3.5 h-3.5 text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Mapa Leaflet */}
       <div className="flex-1 h-full z-10">
